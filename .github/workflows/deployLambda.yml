@@ -1,0 +1,53 @@
+name: Deploy Updated Lambda Functions
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  detect_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed_functions: ${{ steps.changes.outputs.functions }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Detect Changed Functions
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^src/' | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          echo "Changed functions: $CHANGED"
+          echo "::set-output name=functions::$CHANGED"
+
+  deploy:
+    needs: detect_changes
+    if: needs.detect_changes.outputs.changed_functions != '[]'
+    strategy:
+      matrix:
+        function: ${{ fromJson(needs.detect_changes.outputs.changed_functions) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1 # Change to your AWS region
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Package Lambda Function
+        run: |
+          cd src/${{ matrix.function }}
+          zip -r ../../${{ matrix.function }}.zip .
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp ${{ matrix.function }}.zip s3://naz-lambda/
+
+      - name: Deploy Lambda Function
+        run: |
+          aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
