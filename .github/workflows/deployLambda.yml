@@ -23,6 +23,9 @@ jobs:
           fi
           CHANGED_FUNCTIONS=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^lambda-functions/' | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
           echo "functions=$CHANGED_FUNCTIONS" >> $GITHUB_ENV
+          if [ -z "$CHANGED_FUNCTIONS" ] || [ "$CHANGED_FUNCTIONS" = "null" ]; then
+            CHANGED_FUNCTIONS="[]"
+          fi
           echo "::set-output name=functions::$CHANGED_FUNCTIONS"
 
   deploy:
