@@ -14,12 +14,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      - name: Detect Changed Functions
-        id: changes
-        run: |
-          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^src/' | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
-          echo "Changed functions: $CHANGED"
-          echo "::set-output name=functions::$CHANGED"
+     - name: Detect Changed Lambda Functions
+  id: detect
+  run: |
+    PREVIOUS_COMMIT=${{ github.event.before }}
+    if [ -z "$PREVIOUS_COMMIT" ]; then
+      PREVIOUS_COMMIT=$(git rev-parse HEAD^)
+    fi
+    CHANGED_FUNCTIONS=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^lambda-functions/' | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
+    echo "functions=$CHANGED_FUNCTIONS" >> $GITHUB_ENV
+    echo "::set-output name=functions::$CHANGED_FUNCTIONS"
 
   deploy:
     needs: detect_changes
