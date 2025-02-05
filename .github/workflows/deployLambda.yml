@@ -43,13 +43,12 @@ jobs:
           echo "Previous Commit: ${{ github.event.before }}"
           echo "Current Commit: ${{ github.sha }}"
 
+      - name: Debug Changed Functions Output
+        run: |
+          echo "Changed functions JSON output: ${{ steps.detect.outputs.functions }}"
+
   deploy:
     needs: detect_changes
-    
-    - name: Debug Changed Functions Output
-      run: |
-        echo "Changed functions JSON output: ${{ steps.detect.outputs.functions }}"
-
     if: needs.detect_changes.outputs.changed_functions != '[]'
     strategy:
       matrix:
