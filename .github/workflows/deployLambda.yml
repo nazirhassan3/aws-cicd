@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Detect Changed Functions
         id: detect
@@ -27,6 +29,16 @@ jobs:
             CHANGED_FUNCTIONS="[]"
           fi
           echo "::set-output name=functions::$CHANGED_FUNCTIONS"
+
+      - name: Debug Git Changes
+        run: |
+          echo "Fetching full Git history..."
+          git fetch --unshallow
+          git log --oneline -n 5
+          echo "Git diff output:"
+          git diff --name-only HEAD^ HEAD
+          echo "Previous commit: ${{ github.event.before }}"
+          echo "Current commit: ${{ github.sha }}"
 
   deploy:
     needs: detect_changes
