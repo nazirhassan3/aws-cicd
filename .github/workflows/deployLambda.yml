@@ -14,7 +14,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Detect Changed Lambda Functions
         id: detect
@@ -37,12 +37,11 @@ jobs:
           echo "Changed functions: $CHANGED_FUNCTIONS"
           echo "::set-output name=functions::$CHANGED_FUNCTIONS"
 
-        - name: Debug Git History
-          run: |
-            git log --oneline -n 5
-            echo "Previous Commit: ${{ github.event.before }}"
-            echo "Current Commit: ${{ github.sha }}"
-
+      - name: Debug Git History
+        run: |
+          git log --oneline -n 5
+          echo "Previous Commit: ${{ github.event.before }}"
+          echo "Current Commit: ${{ github.sha }}"
 
   deploy:
     needs: detect_changes
