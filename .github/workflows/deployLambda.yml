@@ -82,3 +82,14 @@ jobs:
       - name: Deploy Lambda Function
         run: |
           aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-west-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Deploy Lambda Function
+        run: |
+          aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
