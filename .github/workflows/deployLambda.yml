@@ -40,8 +40,9 @@ jobs:
             fi
 
           echo "Detected changed Lambda functions: $CHANGED_FUNCTIONS"
-          echo "functions=$CHANGED_FUNCTIONS" >> $GITHUB_ENV
-          echo "::set-output name=functions::$CHANGED_FUNCTIONS"
+          # echo "functions=$CHANGED_FUNCTIONS" >> $GITHUB_ENV
+          # echo "::set-output name=functions::$CHANGED_FUNCTIONS"
+          echo "functions=$CHANGED_FUNCTIONS"" >> "$GITHUB_OUTPUT"
 
       - name: Debug Git History
         run: |
@@ -52,12 +53,6 @@ jobs:
       - name: Debug JSON Output
         run: |
           echo "Raw JSON Output: '${{ steps.detect.outputs.functions }}'"
-
-      - name: Set Job Outputs
-        id: set_outputs
-        run: |
-          echo "functions=${{ steps.detect.outputs.functions }}" >> $GITHUB_ENV
-          echo "::set-output name=functions::$CHANGED_FUNCTIONS"
 
   deploy:
     needs: detect_changes
