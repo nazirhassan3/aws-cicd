@@ -9,7 +9,7 @@ jobs:
   detect_changes:
     runs-on: ubuntu-latest
     outputs:
-      changed_functions: ${{ steps.changes.outputs.functions }}
+      changed_functions: ${{ steps.detect.outputs.functions }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
@@ -54,7 +54,7 @@ jobs:
 
   deploy:
     needs: detect_changes
-    if: needs.detect_changes.outputs.changed_functions != '[]'
+    if: needs.detect_changes.outputs.functions != '[]'
     strategy:
       matrix:
         function: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
