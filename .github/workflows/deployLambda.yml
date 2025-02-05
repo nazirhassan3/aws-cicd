@@ -37,6 +37,13 @@ jobs:
           echo "Changed functions: $CHANGED_FUNCTIONS"
           echo "::set-output name=functions::$CHANGED_FUNCTIONS"
 
+        - name: Debug Git History
+          run: |
+            git log --oneline -n 5
+            echo "Previous Commit: ${{ github.event.before }}"
+            echo "Current Commit: ${{ github.sha }}"
+
+
   deploy:
     needs: detect_changes
     if: needs.detect_changes.outputs.changed_functions != '[]'
