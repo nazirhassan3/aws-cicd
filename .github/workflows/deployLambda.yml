@@ -40,8 +40,6 @@ jobs:
             fi
 
           echo "Detected changed Lambda functions: $CHANGED_FUNCTIONS"
-          # echo "functions=$CHANGED_FUNCTIONS" >> $GITHUB_ENV
-          # echo "::set-output name=functions::$CHANGED_FUNCTIONS"
           echo "functions=$CHANGED_FUNCTIONS"" >> "$GITHUB_OUTPUT"
 
       - name: Debug Git History
