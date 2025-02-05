@@ -52,12 +52,16 @@ jobs:
         run: |
           echo "Changed functions JSON output: ${{ steps.detect.outputs.functions }}"
 
+      - name: Set Environment Variable for Functions
+        run: |
+          echo "FUNCTIONS=${{ steps.detect.outputs.functions }}" >> $GITHUB_ENV
+
   deploy:
     needs: detect_changes
     if: needs.detect_changes.outputs.changed_functions != '[]'
     strategy:
       matrix:
-        function: ${{ fromJson(needs.detect_changes.outputs.changed_functions) }}
+        function: ${{ fromJson(env.FUNCTIONS || '[]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
