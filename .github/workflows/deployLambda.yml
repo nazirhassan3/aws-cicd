@@ -16,18 +16,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect Changed Functions
+      - name: Detect Changed Lambda Functions
         id: detect
         run: |
           PREVIOUS_COMMIT=${{ github.event.before }}
+          if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
+            PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
+          fi
+
+          echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
+
           if [ -z "$PREVIOUS_COMMIT" ]; then
-            PREVIOUS_COMMIT=$(git rev-parse HEAD^)
+            CHANGED_FILES=$(git ls-files | grep '^src/' || true)
+          else
+            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/' || true)
           fi
-          CHANGED_FUNCTIONS=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/' | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
-          echo "functions=$CHANGED_FUNCTIONS" >> $GITHUB_ENV
-          if [ -z "$CHANGED_FUNCTIONS" ] || [ "$CHANGED_FUNCTIONS" = "null" ]; then
-            CHANGED_FUNCTIONS="[]"
-          fi
+
+          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) // []')
+
+          echo "Changed functions: $CHANGED_FUNCTIONS"
           echo "::set-output name=functions::$CHANGED_FUNCTIONS"
 
   deploy:
