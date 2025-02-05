@@ -9,7 +9,7 @@ jobs:
   detect_changes:
     runs-on: ubuntu-latest
     outputs:
-      changed_functions: ${{ steps.detect.outputs.functions }}
+      functions: ${{ steps.detect.outputs.FUNCTIONS }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
@@ -40,7 +40,7 @@ jobs:
             fi
 
           echo "Detected changed Lambda functions: $CHANGED_FUNCTIONS"
-          echo "functions=$CHANGED_FUNCTIONS" >> "$GITHUB_OUTPUT"
+          echo "FUNCTIONS=$CHANGED_FUNCTIONS" >> "$GITHUB_OUTPUT"
 
       - name: Debug Git History
         run: |
