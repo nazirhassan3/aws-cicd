@@ -32,10 +32,15 @@ jobs:
             CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/' || true)
           fi
 
-          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) // []')
+          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) | map(.) // []')
 
-          echo "Changed functions: $CHANGED_FUNCTIONS"
-          echo "::set-output name=functions::$CHANGED_FUNCTIONS"
+            # Ensure proper JSON output
+            if [ -z "$CHANGED_FUNCTIONS" ] || [ "$CHANGED_FUNCTIONS" = "null" ]; then
+              CHANGED_FUNCTIONS="[]"
+            fi
+
+            echo "Detected changed Lambda functions: $CHANGED_FUNCTIONS"
+            echo "::set-output name=functions::$CHANGED_FUNCTIONS"
 
       - name: Debug Git History
         run: |
