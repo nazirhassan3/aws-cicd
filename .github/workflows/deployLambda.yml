@@ -39,8 +39,9 @@ jobs:
               CHANGED_FUNCTIONS="[]"
             fi
 
-            echo "Detected changed Lambda functions: $CHANGED_FUNCTIONS"
-            echo "::set-output name=functions::$CHANGED_FUNCTIONS"
+          echo "Detected changed Lambda functions: $CHANGED_FUNCTIONS"
+          echo "functions=$CHANGED_FUNCTIONS" >> $GITHUB_ENV
+          echo "::set-output name=functions::$CHANGED_FUNCTIONS"
 
       - name: Debug Git History
         run: |
@@ -48,20 +49,16 @@ jobs:
           echo "Previous Commit: ${{ github.event.before }}"
           echo "Current Commit: ${{ github.sha }}"
 
-      - name: Debug Changed Functions Output
+      - name: Debug JSON Output
         run: |
-          echo "Changed functions JSON output: ${{ steps.detect.outputs.functions }}"
-
-      - name: Set Environment Variable for Functions
-        run: |
-          echo "FUNCTIONS=${{ steps.detect.outputs.functions }}" >> $GITHUB_ENV
+          echo "Raw JSON Output: '${{ steps.detect.outputs.functions }}'"
 
   deploy:
     needs: detect_changes
     if: needs.detect_changes.outputs.changed_functions != '[]'
     strategy:
       matrix:
-        function: ${{ fromJson(env.FUNCTIONS || '[]') }}
+        function: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
