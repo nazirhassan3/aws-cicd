@@ -45,10 +45,10 @@ jobs:
 
   deploy:
     needs: detect_changes
-    if: needs.detect_changes.outputs.changed_functions != '[]'
+    if: needs.detect_changes.outputs.functions != '[]'
     strategy:
       matrix:
-        function: ${{ fromJson(needs.detect_changes.outputs.changed_functions) }}
+        function: ${{ fromJson(needs.detect_changes.outputs.functions) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
