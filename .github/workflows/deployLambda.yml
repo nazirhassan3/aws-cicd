@@ -128,8 +128,8 @@ jobs:
           DEST_BUCKET=naz-lambda-west
           FUNCTION_NAME=${{ matrix.function }}
           ZIP_FILE="${FUNCTION_NAME}.zip" 
-          LAMBDA_REGION="us-west-1"  # Change to your actual source bucket region
-          SOURCE_REGION="us-east-1"  # Change to your Lambda function region
+          LAMBDA_REGION="us-west-1" 
+          SOURCE_REGION="us-east-1" 
 
           echo "Copying $ZIP_FILE from $SOURCE_BUCKET ($SOURCE_REGION) to $DEST_BUCKET ($LAMBDA_REGION)..."
 
