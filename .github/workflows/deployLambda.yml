@@ -125,7 +125,7 @@ jobs:
       - name: Copy S3 Object to Target Region
         run: |
           SOURCE_BUCKET=naz-lambda
-          DEST_BUCKET=naz-lambda
+          DEST_BUCKET=naz-lambda-west
           FUNCTION_NAME=${{ matrix.function }}
           ZIP_FILE="${FUNCTION_NAME}.zip" 
           LAMBDA_REGION="us-west-1"  # Change to your actual source bucket region
@@ -138,7 +138,7 @@ jobs:
       - name: Deploy Lambda Function
         run: |
           FUNCTION_NAME=${{ matrix.function }}
-          BUCKET_NAME=naz-lambda
+          BUCKET_NAME=naz-lambda-west
           ZIP_FILE="${FUNCTION_NAME}.zip"
           cd src/${{ matrix.function }}
           if [ -f "package.json" ]; then
