@@ -124,4 +124,30 @@ jobs:
 
       - name: Deploy Lambda Function
         run: |
-          aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
+          FUNCTION_NAME=${{ matrix.function }}
+          BUCKET_NAME=naz-lambda
+          ZIP_FILE="${FUNCTION_NAME}.zip"
+          cd src/${{ matrix.function }}
+          if [ -f "package.json" ]; then
+            RUNTIME="nodejs18.x"
+          else
+            RUNTIME="python3.13"
+          fi
+          HANDLER="lambda_handler"  # Change based on your function's entry point
+          ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
+          echo "Checking if Lambda function $FUNCTION_NAME exists..."
+          FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
+          if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
+            echo "Function does not exist. Creating..."
+            aws lambda create-function \
+              --function-name $FUNCTION_NAME \
+              --runtime $RUNTIME \
+              --role $ROLE_ARN \
+              --handler $HANDLER \
+              --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
+              --timeout 10 \
+              --memory-size 128
+          else
+            echo "Function exists. Updating..."
+            aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
+          fi
