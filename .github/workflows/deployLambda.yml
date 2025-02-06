@@ -122,7 +122,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-            - name: Install Dependencies
+      - name: Install Dependencies
         run: |
           cd src/${{ matrix.function }}
           if [ -f "package.json" ]; then npm install; fi
