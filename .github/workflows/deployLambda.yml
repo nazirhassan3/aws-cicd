@@ -115,15 +115,23 @@ jobs:
             aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
           fi
 
-          echo "Publishing new version..."
-          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
-          echo "Latest Version: $VERSION"
+      - name: Wait for Lambda Update to Complete
+        run: |
+          FUNCTION_NAME=${{ matrix.function }}
+          echo "Waiting for Lambda function $FUNCTION_NAME to be in Active state..."
+          STATUS=""
+          while [[ "$STATUS" != "Active" ]]; do
+            sleep 5
+            STATUS=$(aws lambda get-function-configuration --function-name $FUNCTION_NAME --query "State" --output text)
+            echo "Current Status: $STATUS"
+          done
+          echo "Lambda function is now Active."
 
-          echo "Updating dev alias to version $VERSION..."
-          aws lambda update-alias \
-            --function-name $FUNCTION_NAME \
-            --name dev \
-            --function-version $VERSION
+      - name: Publish Lambda Version for Dev
+        run: |
+          FUNCTION_NAME=${{ matrix.function }}
+          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+          aws lambda update-alias --function-name $FUNCTION_NAME --name dev --function-version $VERSION
 
       # - name: Configure AWS Credentials
       #   uses: aws-actions/configure-aws-credentials@v1
