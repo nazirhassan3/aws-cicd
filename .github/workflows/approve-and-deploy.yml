@@ -1,0 +1,46 @@
+name: Approve and Deploy API Gateway
+
+on:
+  workflow_dispatch:
+    inputs:
+      function:
+        description: "Lambda Function to Deploy API Gateway For"
+        required: true
+        type: string
+
+jobs:
+  manual_approval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Manual Approval
+        run: echo "Waiting for manual approval to deploy API Gateway."
+
+  deploy_apigateway:
+    needs: manual_approval
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Publish Lambda Version for Prod
+        run: |
+          FUNCTION_NAME=${{ github.event.inputs.function }}
+          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+          aws lambda update-alias --function-name $FUNCTION_NAME --name prod --function-version $VERSION
+
+      - name: Deploy API Gateway to Prod
+        run: |
+          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='api-${{ github.event.inputs.function }}'].ApiId" --output text)
+          aws apigatewayv2 update-integration \
+            --api-id $API_ID \
+            --integration-id <INTEGRATION_ID> \
+            --integration-uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:${{ github.event.inputs.function }}:prod/invocations"
+
+          aws apigatewayv2 create-deployment --api-id $API_ID --stage-name prod

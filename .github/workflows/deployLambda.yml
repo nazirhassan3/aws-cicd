@@ -92,7 +92,7 @@ jobs:
           ZIP_FILE="${FUNCTION_NAME}.zip"
           cd src/${{ matrix.function }}
           if [ -f "package.json" ]; then
-            RUNTIME="nodejs18.x"
+            RUNTIME="nodejs18.x" #change to X
           else
             RUNTIME="python3.13"
           fi
@@ -115,52 +115,84 @@ jobs:
             aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
           fi
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+          echo "Publishing new version..."
+          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+          echo "Latest Version: $VERSION"
+
+          echo "Updating dev alias to version $VERSION..."
+          aws lambda update-alias \
+            --function-name $FUNCTION_NAME \
+            --name dev \
+            --function-version $VERSION
+
+      # - name: Configure AWS Credentials
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-region: us-west-1
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # - name: Copy S3 Object to Target Region
+      #   run: |
+      #     SOURCE_BUCKET=naz-lambda
+      #     DEST_BUCKET=naz-lambda-west
+      #     FUNCTION_NAME=${{ matrix.function }}
+      #     ZIP_FILE="${FUNCTION_NAME}.zip"
+      #     LAMBDA_REGION="us-west-1"
+      #     SOURCE_REGION="us-east-1"
+
+      #     echo "Copying $ZIP_FILE from $SOURCE_BUCKET ($SOURCE_REGION) to $DEST_BUCKET ($LAMBDA_REGION)..."
+
+      #     aws s3 cp s3://$SOURCE_BUCKET/$ZIP_FILE s3://$DEST_BUCKET/$ZIP_FILE --source-region $SOURCE_REGION --region $LAMBDA_REGION
+
+      # - name: Deploy Lambda Function
+      #   run: |
+      #     FUNCTION_NAME=${{ matrix.function }}
+      #     BUCKET_NAME=naz-lambda-west
+      #     ZIP_FILE="${FUNCTION_NAME}.zip"
+      #     cd src/${{ matrix.function }}
+      #     if [ -f "package.json" ]; then
+      #       RUNTIME="nodejs18.x"
+      #     else
+      #       RUNTIME="python3.13"
+      #     fi
+      #     HANDLER="lambda_handler"  # Change based on your function's entry point
+      #     ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
+      #     echo "Checking if Lambda function $FUNCTION_NAME exists..."
+      #     FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
+      #     if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
+      #       echo "Function does not exist. Creating..."
+      #       aws lambda create-function \
+      #         --function-name $FUNCTION_NAME \
+      #         --runtime $RUNTIME \
+      #         --role $ROLE_ARN \
+      #         --handler $HANDLER \
+      #         --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
+      #         --timeout 10 \
+      #         --memory-size 128
+      #     else
+      #       echo "Function exists. Updating..."
+      #       aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
+      #     fi
+
+      #      echo "Publishing new version..."
+      #     VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+      #     echo "Latest Version: $VERSION"
+
+      #     echo "Updating dev alias to version $VERSION..."
+      #     aws lambda update-alias \
+      #       --function-name $FUNCTION_NAME \
+      #       --name dev \
+      #       --function-version $VERSION
+
+      - name: Deploy API Gateway Dev
+        run: |
+          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='api-${{ matrix.function }}'].ApiId" --output text)
+          aws apigatewayv2 create-deployment --api-id $API_ID --stage-name dev
+
+      - name: Trigger API Gateway Deployment Approval
+        uses: benc-uk/workflow-dispatch@v1
         with:
-          aws-region: us-west-1
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Copy S3 Object to Target Region
-        run: |
-          SOURCE_BUCKET=naz-lambda
-          DEST_BUCKET=naz-lambda-west
-          FUNCTION_NAME=${{ matrix.function }}
-          ZIP_FILE="${FUNCTION_NAME}.zip" 
-          LAMBDA_REGION="us-west-1" 
-          SOURCE_REGION="us-east-1" 
-
-          echo "Copying $ZIP_FILE from $SOURCE_BUCKET ($SOURCE_REGION) to $DEST_BUCKET ($LAMBDA_REGION)..."
-
-          aws s3 cp s3://$SOURCE_BUCKET/$ZIP_FILE s3://$DEST_BUCKET/$ZIP_FILE --source-region $SOURCE_REGION --region $LAMBDA_REGION
-
-      - name: Deploy Lambda Function
-        run: |
-          FUNCTION_NAME=${{ matrix.function }}
-          BUCKET_NAME=naz-lambda-west
-          ZIP_FILE="${FUNCTION_NAME}.zip"
-          cd src/${{ matrix.function }}
-          if [ -f "package.json" ]; then
-            RUNTIME="nodejs18.x"
-          else
-            RUNTIME="python3.13"
-          fi
-          HANDLER="lambda_handler"  # Change based on your function's entry point
-          ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
-          echo "Checking if Lambda function $FUNCTION_NAME exists..."
-          FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
-          if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
-            echo "Function does not exist. Creating..."
-            aws lambda create-function \
-              --function-name $FUNCTION_NAME \
-              --runtime $RUNTIME \
-              --role $ROLE_ARN \
-              --handler $HANDLER \
-              --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
-              --timeout 10 \
-              --memory-size 128
-          else
-            echo "Function exists. Updating..."
-            aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
-          fi
+          workflow: "approve-and-deploy.yml"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          inputs: '{"function": "${{ matrix.function }}"}'
