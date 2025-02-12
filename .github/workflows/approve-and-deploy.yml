@@ -70,7 +70,7 @@ jobs:
 
           INTEGRATION_ID=$(aws apigateway get-integration \
             --rest-api-id "$API_ID" \
-            --query "items[0].id" --output text --region $AWS_REGION)
+            --query "items[0].id" --output text)
 
           if [[ -z "$INTEGRATION_ID" || "$INTEGRATION_ID" == "None" ]]; then
             echo "ERROR: No existing integration found for API Gateway ID: $API_ID"
