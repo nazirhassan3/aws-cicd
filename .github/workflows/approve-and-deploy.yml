@@ -57,8 +57,7 @@ jobs:
         id: get_integration_id
         run: |
           API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ github.event.inputs.function }}'].id" --output text)
-          API_ID="${{ env.API_ID }}"
-          echo "Fetching Integration ID for API: $API_ID"
+          echo "Fetching Integration ID for API: '$API_ID'"
 
           INTEGRATION_ID=$(aws apigateway get-integration \
             --rest-api-id "$API_ID" \
@@ -69,7 +68,7 @@ jobs:
             exit 1
           fi
 
-          echo "Found Integration ID: $INTEGRATION_ID"
+          echo "Found Integration ID: '$INTEGRATION_ID'"
           echo "INTEGRATION_ID=$INTEGRATION_ID" >> $GITHUB_ENV
 
       - name: Get Lambda Integration URI
