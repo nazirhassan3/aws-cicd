@@ -37,10 +37,10 @@ jobs:
 
       - name: Deploy API Gateway to Prod
         run: |
-          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='api-${{ github.event.inputs.function }}'].ApiId" --output text)
+          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='${{ github.event.inputs.function }}'].ApiId" --output text)
           aws apigatewayv2 update-integration \
             --api-id $API_ID \
             --integration-id <INTEGRATION_ID> \
-            --integration-uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:${{ github.event.inputs.function }}:prod/invocations"
+            --integration-uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:443370673783:function:${{ github.event.inputs.function }}:prod/invocations"
 
           aws apigatewayv2 create-deployment --api-id $API_ID --stage-name prod
