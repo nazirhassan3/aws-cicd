@@ -70,6 +70,8 @@ jobs:
 
           INTEGRATION_ID=$(aws apigateway get-integration \
             --rest-api-id "$API_ID" \
+            --resource-id "$RESOURCE_ID" \
+            --http-method "$HTTP_METHOD" \
             --query "items[0].id" --output text)
 
           if [[ -z "$INTEGRATION_ID" || "$INTEGRATION_ID" == "None" ]]; then
