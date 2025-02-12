@@ -90,11 +90,10 @@ jobs:
               --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/$FUNCTION_ARN/invocations" \
               --query "id" --output text")
             echo "Created new integration with ID: $NEW_INTEGRATION_ID"
-            INTEGRATION_ID="$NEW_INTEGRATION_ID"
           fi
 
-          echo "Found Integration ID: '$INTEGRATION_ID'"
-          echo "INTEGRATION_ID=$INTEGRATION_ID" >> $GITHUB_ENV
+          echo "Found Integration ID: '$NEW_INTEGRATION_ID'"
+          echo "INTEGRATION_ID=$NEW_INTEGRATION_ID" >> $GITHUB_ENV
 
       - name: Deploy API Gateway to Prod
         run: |
