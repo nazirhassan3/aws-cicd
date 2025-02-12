@@ -214,13 +214,13 @@ jobs:
       - name: Debug API Gateway List
         run: |
           echo "Fetching all API Gateways..."
-          aws apigatewayv2 get-apis --query "Items[*].{Name: Name, ID: ApiId}" --output table
+          aws apigateway get-apis --query "Items[*].{Name: Name, ID: ApiId}" --output table
 
       - name: Deploy API Gateway Dev
         run: |
-          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='${{ matrix.function }}'].ApiId" --output text)
+          API_ID=$(aws apigateway get-apis --query "Items[?Name=='${{ matrix.function }}'].ApiId" --output text)
           echo "Retrieved API_ID: '$API_ID'"
-          aws apigatewayv2 create-deployment --api-id $API_ID --stage-name dev
+          aws apigateway create-deployment --api-id $API_ID --stage-name dev
 
       - name: Trigger API Gateway Deployment Approval
         uses: benc-uk/workflow-dispatch@v1
