@@ -127,11 +127,29 @@ jobs:
           done
           echo "Lambda function is now Active."
 
-      - name: Publish Lambda Version for Dev
+      - name: Ensure Alias Exists and Update
         run: |
           FUNCTION_NAME=${{ matrix.function }}
+          ALIAS_NAME="dev"
           VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
-          aws lambda update-alias --function-name $FUNCTION_NAME --name dev --function-version $VERSION
+
+          ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
+
+          if [[ -z "$ALIAS_EXISTS" ]]; then
+            echo "Alias '$ALIAS_NAME' does not exist. Creating it..."
+            aws lambda create-alias \
+              --function-name $FUNCTION_NAME \
+              --name $ALIAS_NAME \
+              --function-version $VERSION
+          else
+            echo "Alias '$ALIAS_NAME' exists. Updating it..."
+            aws lambda update-alias \
+              --function-name $FUNCTION_NAME \
+              --name $ALIAS_NAME \
+              --function-version $VERSION
+          fi
+
+          echo "Alias '$ALIAS_NAME' now points to version $VERSION"
 
       # - name: Configure AWS Credentials
       #   uses: aws-actions/configure-aws-credentials@v1
