@@ -68,6 +68,10 @@ jobs:
           echo "Found HTTP Method: $HTTP_METHOD"
           echo "HTTP_METHOD=$HTTP_METHOD" >> $GITHUB_ENV
 
+          FUNCTION_ARN=$(aws lambda get-function --function-name "${{ github.event.inputs.function }}" --query "Configuration.FunctionArn" --output text)
+          echo "Lambda Function ARN: $FUNCTION_ARN"
+          echo "INTEGRATION_URI=$FUNCTION_ARN" >> $GITHUB_ENV
+
           INTEGRATION_ID=$(aws apigateway get-integration \
             --rest-api-id "$API_ID" \
             --resource-id "$RESOURCE_ID" \
@@ -75,25 +79,20 @@ jobs:
             --query "items[0].id" --output text)
 
           if [[ -z "$INTEGRATION_ID" || "$INTEGRATION_ID" == "None" ]]; then
-            echo "ERROR: No existing integration found for API Gateway ID: $API_ID"
-            exit 1
+            NEW_INTEGRATION_ID=$(aws apigateway put-integration \
+              --rest-api-id "$API_ID" \
+              --resource-id "$RESOURCE_ID" \
+              --http-method "$HTTP_METHOD" \
+              --type AWS_PROXY \
+              --integration-http-method POST \
+              --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/$FUNCTION_ARN/invocations" \
+              --query "id" --output text")
+            echo "Created new integration with ID: $NEW_INTEGRATION_ID"
+            INTEGRATION_ID="$NEW_INTEGRATION_ID"
           fi
 
           echo "Found Integration ID: '$INTEGRATION_ID'"
           echo "INTEGRATION_ID=$INTEGRATION_ID" >> $GITHUB_ENV
-
-      - name: Get Lambda Integration URI
-        id: get_integration_uri
-        run: |
-          FUNCTION_ARN=$(aws lambda get-function --function-name "${{ github.event.inputs.function }}" --query "Configuration.FunctionArn" --output text)
-
-          if [[ -z "$FUNCTION_ARN" || "$FUNCTION_ARN" == "None" ]]; then
-            echo "ERROR: Lambda function '${{ github.event.inputs.function }}' not found."
-            exit 1
-          fi
-
-          echo "Lambda Function ARN: $FUNCTION_ARN"
-          echo "INTEGRATION_URI=$FUNCTION_ARN" >> $GITHUB_ENV
 
       - name: Deploy API Gateway to Prod
         run: |
