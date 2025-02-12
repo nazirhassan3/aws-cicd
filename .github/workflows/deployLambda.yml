@@ -214,6 +214,7 @@ jobs:
       - name: Deploy API Gateway Dev
         run: |
           API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='${{ matrix.function }}'].ApiId" --output text)
+          echo "Retrieved API_ID: '$API_ID'"
           aws apigatewayv2 create-deployment --api-id $API_ID --stage-name dev
 
       - name: Trigger API Gateway Deployment Approval
