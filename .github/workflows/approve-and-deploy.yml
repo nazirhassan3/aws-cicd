@@ -66,7 +66,7 @@ jobs:
           echo "Fetching Integration ID for API: '$API_ID'"
 
           echo "Fetching Resource ID for API: $API_ID"
-          RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/${{ github.event.inputs.function }}'].id" --output text)
+          RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
           echo "Found Resource ID: $RESOURCE_ID"
           echo "RESOURCE_ID=$RESOURCE_ID" >> $GITHUB_ENV
 
