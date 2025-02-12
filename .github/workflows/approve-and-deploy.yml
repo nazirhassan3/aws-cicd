@@ -70,7 +70,7 @@ jobs:
 
           FUNCTION_ARN=$(aws lambda get-function --function-name "${{ github.event.inputs.function }}" --query "Configuration.FunctionArn" --output text)
           echo "Lambda Function ARN: $FUNCTION_ARN"
-          echo "INTEGRATION_URI=$FUNCTION_ARN" >> $GITHUB_ENV
+          echo "INTEGRATION_URI=$FUNCTION_ARN" >> $GITHUB_ENV"
 
           INTEGRATION_ID=$(aws apigateway get-integration \
             --rest-api-id "$API_ID" \
