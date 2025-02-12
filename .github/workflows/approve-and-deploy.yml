@@ -53,6 +53,12 @@ jobs:
 
           echo "Alias '$ALIAS_NAME' now points to version $VERSION"
 
+      - name: Debug API Gateway Resources
+        run: |
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ github.event.inputs.function }}'].id" --output text)
+          echo "Listing all resources for API Gateway ID: $API_ID"
+          aws apigateway get-resources --rest-api-id "$API_ID" --query "items[*].{ID: id, Path: path}" --output table --region us-east-1
+
       - name: Get Integration ID
         id: get_integration_id
         run: |
