@@ -59,6 +59,15 @@ jobs:
           API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ github.event.inputs.function }}'].id" --output text)
           echo "Fetching Integration ID for API: '$API_ID'"
 
+          echo "Fetching Resource ID for API: $API_ID"
+          RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/${{ github.event.inputs.function }}'].id" --output text)
+          echo "Found Resource ID: $RESOURCE_ID"
+          echo "RESOURCE_ID=$RESOURCE_ID" >> $GITHUB_ENV
+
+          HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
+          echo "Found HTTP Method: $HTTP_METHOD"
+          echo "HTTP_METHOD=$HTTP_METHOD" >> $GITHUB_ENV
+
           INTEGRATION_ID=$(aws apigateway get-integration \
             --rest-api-id "$API_ID" \
             --query "items[0].id" --output text --region $AWS_REGION)
@@ -86,9 +95,16 @@ jobs:
 
       - name: Deploy API Gateway to Prod
         run: |
+
+          API_ID="${{ env.API_ID }}"
+          RESOURCE_ID="${{ env.RESOURCE_ID }}"
+          HTTP_METHOD="${{ env.HTTP_METHOD }}"
+          INTEGRATION_URI="${{ env.INTEGRATION_URI }}"
+
           aws apigateway update-integration \
-            --api-id ${{ env.API_ID }} \
-            --integration-id ${{ env.INTEGRATION_ID }} \
-            --integration-uri "${{ env.INTEGRATION_URI }}"
+            --rest-api-id "$API_ID" \
+            --resource-id "$RESOURCE_ID" \
+            --http-method "$HTTP_METHOD" \
+            --patch-operations "op='replace',path='/uri',value='$INTEGRATION_URI'" \
 
           aws apigatewayv2 create-deployment --api-id ${{ env.API_ID }} --stage-name prod
