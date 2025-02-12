@@ -211,6 +211,11 @@ jobs:
       #       --name dev \
       #       --function-version $VERSION
 
+      - name: Debug API Gateway List
+        run: |
+          echo "Fetching all API Gateways..."
+          aws apigatewayv2 get-apis --query "Items[*].{Name: Name, ID: ApiId}" --output table
+
       - name: Deploy API Gateway Dev
         run: |
           API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='${{ matrix.function }}'].ApiId" --output text)
