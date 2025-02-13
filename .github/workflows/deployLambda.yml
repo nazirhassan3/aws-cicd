@@ -214,7 +214,7 @@ jobs:
       - name: Update API Gateway Integration for Dev
         run: |
           # Retrieve API Gateway ID for your dev API (adjust API name as needed)
-          API_NAME="${{ matrix.function }}-API"  
+          API_NAME="${{ matrix.function }}"  
           API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
           if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
             echo "ERROR: REST API '$API_NAME' not found."
