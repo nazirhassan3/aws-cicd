@@ -235,7 +235,6 @@ jobs:
             --resource-id "$RESOURCE_ID" \
             --http-method "$HTTP_METHOD" \
             --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$INTEGRATION_URI\"}]" \
-            --region $AWS_REGION
 
       # - name: Deploy API Gateway Dev
       #   run: |
