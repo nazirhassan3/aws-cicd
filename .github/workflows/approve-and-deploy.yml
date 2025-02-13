@@ -105,11 +105,16 @@ jobs:
           RESOURCE_ID="${{ env.RESOURCE_ID }}"
           HTTP_METHOD="${{ env.HTTP_METHOD }}"
           INTEGRATION_URI="${{ env.INTEGRATION_URI }}"
-          echo "Lambda Function ARN: '$INTEGRATION_URI'"
+
+          echo "API_ID: $API_ID"
+          echo "RESOURCE_ID: $RESOURCE_ID"
+          echo "HTTP_METHOD: $HTTP_METHOD"
+          echo "INTEGRATION_URI: $INTEGRATION_URI"
+
           aws apigateway update-integration \
             --rest-api-id "$API_ID" \
             --resource-id "$RESOURCE_ID" \
             --http-method "$HTTP_METHOD" \
             --patch-operations '[{"op": "replace", "path": "/uri", "value": "'"$INTEGRATION_URI"'"}]' \
 
-          aws apigatewayv2 create-deployment --api-id ${{ env.API_ID }} --stage-name prod
+          aws apigateway create-deployment --rest-api-id ${{ env.API_ID }} --stage-name prod
