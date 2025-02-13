@@ -10,6 +10,8 @@ on:
 
 jobs:
   manual_approval:
+    environment:
+      name: Production
     runs-on: ubuntu-latest
     steps:
       - name: Request Manual Approval
