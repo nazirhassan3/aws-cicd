@@ -85,8 +85,8 @@ jobs:
               --rest-api-id "$API_ID" \
               --resource-id "$RESOURCE_ID" \
               --http-method "$HTTP_METHOD" \
-              --type AWS_PROXY \
-              --integration-http-method POST \
+              --type "AWS_PROXY" \
+              --integration-http-method "POST" \
               --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/$FUNCTION_ARN/invocations" \
               --query "id" --output text")
             echo "Created new integration with ID: $NEW_INTEGRATION_ID"
