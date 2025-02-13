@@ -92,10 +92,11 @@ jobs:
                 --query "id" --output text
             )
             echo "Created new integration with ID: $NEW_INTEGRATION_ID"
+            INTEGRATION_ID="$NEW_INTEGRATION_ID"
           fi
 
           echo "Found Integration ID: '$NEW_INTEGRATION_ID'"
-          echo "INTEGRATION_ID=$NEW_INTEGRATION_ID" >> $GITHUB_ENV
+          echo "INTEGRATION_ID=$INTEGRATION_ID" >> $GITHUB_ENV
 
       - name: Deploy API Gateway to Prod
         run: |
@@ -109,6 +110,6 @@ jobs:
             --rest-api-id "$API_ID" \
             --resource-id "$RESOURCE_ID" \
             --http-method "$HTTP_METHOD" \
-            --patch-operations "op='replace',path='/uri',value='$INTEGRATION_URI'" \
+            --patch-operations '[{"op": "replace", "path": "/uri", "value": "'"$INTEGRATION_URI"'"}]' \
 
           aws apigatewayv2 create-deployment --api-id ${{ env.API_ID }} --stage-name prod
