@@ -234,12 +234,12 @@ jobs:
           FUNCTION_NAME="${FUNCTION_ARN}:\${stageVariables.lambdaAlias}"
           echo "FUNCTION_NAME: $FUNCTION_NAME"
 
-          aws lambda add-permission \
-            --function-name "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev" \
-            --source-arn "arn:aws:execute-api:us-east-1:443370673783:c6uxh6ofe7/*/GET/" \
-            --principal apigateway.amazonaws.com \
-            --statement-id a0671108-934a-4f32-bd79-b038511456a0 \
-            --action lambda:InvokeFunction
+          # aws lambda add-permission \
+          #   --function-name "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev" \
+          #   --source-arn "arn:aws:execute-api:us-east-1:443370673783:c6uxh6ofe7/*/GET/" \
+          #   --principal apigateway.amazonaws.com \
+          #   --statement-id a0671108-934a-4f32-bd79-b038511456a0 \
+          #   --action lambda:InvokeFunction
 
           aws apigateway update-integration \
             --rest-api-id "$API_ID" \
