@@ -235,7 +235,7 @@ jobs:
           echo "FUNCTION_NAME: $FUNCTION_NAME"
 
           aws lambda add-permission \
-            --function-name $FUNCTION_NAME \
+            --function-name "$FUNCTION_NAME" \
             --source-arn "arn:aws:execute-api:us-east-1:${ACCOUNT_ID}:${API_ID}/*/${HTTP_METHOD}/" \ 
             --principal apigateway.amazonaws.com \
             --statement-id a0671108-934a-4f32-bd79-b038511456a0 \
