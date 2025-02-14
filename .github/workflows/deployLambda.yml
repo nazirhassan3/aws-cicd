@@ -230,6 +230,16 @@ jobs:
           INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}:dev/invocations"
           echo "Updating API Gateway integration URI to: $INTEGRATION_URI"
 
+          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          FUNCTION_NAME=${{ matrix.function }}
+
+          aws lambda add-permission \
+            --function-name $FUNCTION_NAME \
+            --source-arn "arn:aws:execute-api:us-east-1:${ACCOUNT_ID}:${API_ID}/*/{$HTTP_METHOD}/" \ 
+            --principal apigateway.amazonaws.com \
+            --statement-id a0671108-934a-4f32-bd79-b038511456a0 \
+            --action lambda:InvokeFunction
+
           aws apigateway update-integration \
             --rest-api-id "$API_ID" \
             --resource-id "$RESOURCE_ID" \
