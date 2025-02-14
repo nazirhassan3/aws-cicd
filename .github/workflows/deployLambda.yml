@@ -231,7 +231,7 @@ jobs:
           echo "Updating API Gateway integration URI to: $INTEGRATION_URI"
 
           ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-          FUNCTION_NAME="${FUNCTION_ARN}:${stageVariables.lambdaAlias}"
+          FUNCTION_NAME="${FUNCTION_ARN}:`${stageVariables.lambdaAlias}`"
           echo "FUNCTION_NAME: $FUNCTION_NAME"
 
           aws lambda add-permission \
