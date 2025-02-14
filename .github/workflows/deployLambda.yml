@@ -236,11 +236,11 @@ jobs:
             --http-method "$HTTP_METHOD" \
             --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$INTEGRATION_URI\"}]" \
 
-      # - name: Deploy API Gateway Dev
-      #   run: |
-      #     API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ matrix.function }}'].id" --output text)
-      #     echo "Retrieved API_ID: '$API_ID'"
-      #     aws apigateway create-deployment --rest-api-id $API_ID --stage-name dev
+      - name: Deploy API Gateway Dev
+        run: |
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ matrix.function }}'].id" --output text)
+          echo "Retrieved API_ID: '$API_ID'"
+          aws apigateway create-deployment --rest-api-id $API_ID --stage-name dev
 
       - name: Trigger API Gateway Deployment Approval
         uses: benc-uk/workflow-dispatch@v1
