@@ -130,9 +130,12 @@ jobs:
           LAMBDA_ARN="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}:${ALIAS}"
           echo "Lambda ARN: $LAMBDA_ARN"
           SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
+          echo "SOURCE_ARN: $SOURCE_ARN"
           # Try to get the current policy for the Lambda function
           POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)  
+          echo "POLICY: $POLICY"
           STATEMENT_ID=${{ github.event.inputs.function }}-prod  
+          echo "STATEMENT_ID: $STATEMENT_ID"
           if [ -z "$POLICY" ]; then
             echo "No existing policy found. Adding permission..."
             aws lambda add-permission \
