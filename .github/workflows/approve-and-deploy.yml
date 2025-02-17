@@ -123,6 +123,7 @@ jobs:
       - name: Check and Add Lambda Permission
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          echo "ACCOUNT_ID: $ACCOUNT_ID"
           FUNCTION_NAME="${{ github.event.inputs.function }}"
           AWS_REGION=us-east-1
           ALIAS=prod
@@ -132,7 +133,7 @@ jobs:
           SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
           echo "SOURCE_ARN: $SOURCE_ARN"
           # Try to get the current policy for the Lambda function
-          POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)  
+          POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/prod/null)  
           echo "POLICY: $POLICY"
           STATEMENT_ID=${{ github.event.inputs.function }}-prod  
           echo "STATEMENT_ID: $STATEMENT_ID"
