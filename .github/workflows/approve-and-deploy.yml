@@ -158,4 +158,4 @@ jobs:
             fi
           fi
 
-          aws apigateway create-deployment --rest-api-id ${{ env.API_ID }} --stage-name prod
+          aws apigateway create-deployment --rest-api-id ${API_ID} --stage-name prod
