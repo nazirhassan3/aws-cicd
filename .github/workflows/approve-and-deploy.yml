@@ -131,7 +131,7 @@ jobs:
           echo "Lambda ARN: $LAMBDA_ARN"
           SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
           # Try to get the current policy for the Lambda function
-          POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION")  
+          POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)  
           if [ -z "$POLICY" ]; then
             echo "No existing policy found. Adding permission..."
             aws lambda add-permission \
@@ -143,7 +143,7 @@ jobs:
               --region "$AWS_REGION"
           else
             # Extract the policy document and check for the statement ID
-            EXISTS=$(echo "$POLICY" | jq -r --arg sid "$STATEMENT_ID" '.Policy | fromjson | .Statement[] | select(.Sid==$sid) | .Sid')
+            EXISTS=$(echo "$POLICY" | jq -r --arg sid "$STATEMENT_ID" '.Policy | fromjson | .Statement[] | select(.Sid==$sid) | .Sid' 2>/dev/null)
             if [ "$EXISTS" == "$STATEMENT_ID" ]; then
               echo "Permission with StatementId '$STATEMENT_ID' already exists for $LAMBDA_ARN."
             else
