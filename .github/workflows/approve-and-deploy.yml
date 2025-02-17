@@ -119,4 +119,42 @@ jobs:
             --http-method "$HTTP_METHOD" \
             --patch-operations '[{"op": "replace", "path": "/uri", "value": "'"$INTEGRATION_URI"'"}]' \
 
+      - name: Check and Add Lambda Permission
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          FUNCTION_NAME="${{ matrix.function }}"
+          AWS_REGION=us-east-1
+          ALIAS=prod
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
+          LAMBDA_ARN="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}:${ALIAS}"
+          echo "Lambda ARN: $LAMBDA_ARN"
+          SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
+          # Try to get the current policy for the Lambda function
+          POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)  
+          if [ -z "$POLICY" ]; then
+            echo "No existing policy found. Adding permission..."
+            aws lambda add-permission \
+              --function-name "$LAMBDA_ARN" \
+              --statement-id "${{ matrix.function }}-dev" \
+              --action lambda:InvokeFunction \
+              --principal apigateway.amazonaws.com \
+              --source-arn "$SOURCE_ARN" \
+              --region "$AWS_REGION"
+          else
+            # Extract the policy document and check for the statement ID
+            EXISTS=$(echo "$POLICY" | jq -r --arg sid "$STATEMENT_ID" '.Policy | fromjson | .Statement[] | select(.Sid==$sid) | .Sid' 2>/dev/null)
+            if [ "$EXISTS" == "$STATEMENT_ID" ]; then
+              echo "Permission with StatementId '$STATEMENT_ID' already exists for $LAMBDA_ARN."
+            else
+              echo "Permission with StatementId '$STATEMENT_ID' does not exist. Adding permission..."
+              aws lambda add-permission \
+                --function-name "$LAMBDA_ARN" \
+                --statement-id "$STATEMENT_ID" \
+                --action lambda:InvokeFunction \
+                --principal apigateway.amazonaws.com \
+                --source-arn "$SOURCE_ARN" \
+                --region "$AWS_REGION"
+            fi
+          fi
+
           aws apigateway create-deployment --rest-api-id ${{ env.API_ID }} --stage-name prod
