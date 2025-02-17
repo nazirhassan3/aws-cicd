@@ -69,35 +69,35 @@ jobs:
           echo "Found HTTP Method: $HTTP_METHOD"
           echo "HTTP_METHOD=$HTTP_METHOD" >> $GITHUB_ENV
 
-          FUNCTION_ARN=$(aws lambda get-function --function-name "${{ github.event.inputs.function }}" --query "Configuration.FunctionArn" --output text)
-          echo "Lambda Function ARN: $FUNCTION_ARN"
-          echo "INTEGRATION_URI=arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/$FUNCTION_ARN/invocations" >> $GITHUB_ENV
+          # FUNCTION_ARN=$(aws lambda get-function --function-name "${{ github.event.inputs.function }}" --query "Configuration.FunctionArn" --output text)
+          # echo "Lambda Function ARN: $FUNCTION_ARN"
+          # echo "INTEGRATION_URI=arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/$FUNCTION_ARN/invocations" >> $GITHUB_ENV
 
-          INTEGRATION_ID=$(aws apigateway get-integration \
-            --rest-api-id "$API_ID" \
-            --resource-id "$RESOURCE_ID" \
-            --http-method "$HTTP_METHOD" \
-            --query "items[0].id" --output text)
+          # INTEGRATION_ID=$(aws apigateway get-integration \
+          #   --rest-api-id "$API_ID" \
+          #   --resource-id "$RESOURCE_ID" \
+          #   --http-method "$HTTP_METHOD" \
+          #   --query "items[0].id" --output text)
 
-          echo "Found INTEGRATION ID: $INTEGRATION_ID"
+          # echo "Found INTEGRATION ID: $INTEGRATION_ID"
 
-          if [[ -z "$INTEGRATION_ID" || "$INTEGRATION_ID" == "None" ]]; then
-            NEW_INTEGRATION_ID=$(
-              aws apigateway put-integration \
-                --rest-api-id "$API_ID" \
-                --resource-id "$RESOURCE_ID" \
-                --http-method "$HTTP_METHOD" \
-                --type "AWS_PROXY" \
-                --integration-http-method "POST" \
-                --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/$FUNCTION_ARN/invocations" \
-                --query "id" --output text
-            )
-            echo "Created new integration with ID: $NEW_INTEGRATION_ID"
-            INTEGRATION_ID="$NEW_INTEGRATION_ID"
-          fi
+          # if [[ -z "$INTEGRATION_ID" || "$INTEGRATION_ID" == "None" ]]; then
+          #   NEW_INTEGRATION_ID=$(
+          #     aws apigateway put-integration \
+          #       --rest-api-id "$API_ID" \
+          #       --resource-id "$RESOURCE_ID" \
+          #       --http-method "$HTTP_METHOD" \
+          #       --type "AWS_PROXY" \
+          #       --integration-http-method "POST" \
+          #       --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/$FUNCTION_ARN/invocations" \
+          #       --query "id" --output text
+          #   )
+          #   echo "Created new integration with ID: $NEW_INTEGRATION_ID"
+          #   INTEGRATION_ID="$NEW_INTEGRATION_ID"
+          # fi
 
-          echo "Found Integration ID: '$NEW_INTEGRATION_ID'"
-          echo "INTEGRATION_ID=$INTEGRATION_ID" >> $GITHUB_ENV
+          # echo "Found Integration ID: '$NEW_INTEGRATION_ID'"
+          # echo "INTEGRATION_ID=$INTEGRATION_ID" >> $GITHUB_ENV
           echo "API_ID=$API_ID" >> $GITHUB_ENV
 
       - name: Deploy API Gateway to Prod
@@ -106,8 +106,9 @@ jobs:
           API_ID="${{ env.API_ID }}"
           RESOURCE_ID="${{ env.RESOURCE_ID }}"
           HTTP_METHOD="${{ env.HTTP_METHOD }}"
-          INTEGRATION_URI="${{ env.INTEGRATION_URI }}"
-
+          # INTEGRATION_URI="${{ env.INTEGRATION_URI }}"
+          FUNCTION_ARN=$(aws lambda get-function --function-name "${{ github.event.inputs.function }}" --query "Configuration.FunctionArn" --output text)
+          INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}:\${stageVariables.lambdaAlias}/invocations"
           echo "API_ID: $API_ID"
           echo "RESOURCE_ID: $RESOURCE_ID"
           echo "HTTP_METHOD: $HTTP_METHOD"
