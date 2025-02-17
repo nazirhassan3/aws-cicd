@@ -126,7 +126,7 @@ jobs:
           FUNCTION_NAME="${{ github.event.inputs.function }}"
           AWS_REGION=us-east-1
           ALIAS=prod
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$FUNCTION_NAME'].id | [0]" --output text)
           LAMBDA_ARN="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}:${ALIAS}"
           echo "Lambda ARN: $LAMBDA_ARN"
           SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
