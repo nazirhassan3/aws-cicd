@@ -227,7 +227,7 @@ jobs:
 
           # Build integration URI using the dev alias
           FUNCTION_ARN=$(aws lambda get-function --function-name "${{ matrix.function }}" --query "Configuration.FunctionArn" --output text)
-          INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}:dev/invocations"
+          INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}:\${stageVariables.lambdaAlias}/invocations"
           echo "Updating API Gateway integration URI to: $INTEGRATION_URI"
 
           ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
