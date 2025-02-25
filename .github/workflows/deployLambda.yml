@@ -92,18 +92,18 @@ jobs:
           if [ -f "package.json" ]; then npm install; fi
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt -t .; fi
 
-      - name: [Lambda] Package Lambda Function
+      - name: Lambda Package Lambda Function
         if: ${{ matrix.integration.integrationType == 'lambda' }}
         run: |
           cd src/${{ matrix.integration.function }}
           zip -r ../../${{ matrix.integration.function }}.zip .
 
-      - name: [Lambda] Upload to S3
+      - name: Lambda Upload to S3
         if: ${{ matrix.integration.integrationType == 'lambda' }}
         run: |
           aws s3 cp ${{ matrix.integration.function }}.zip s3://naz-lambda/
 
-      - name: [Lambda] Deploy Lambda Function (Create or Update)
+      - name: Lambda Deploy Lambda Function (Create or Update)
         if: ${{ matrix.integration.integrationType == 'lambda' }}
         run: |
           FUNCTION_NAME=${{ matrix.integration.function }}
@@ -134,7 +134,7 @@ jobs:
             aws lambda update-function-code --function-name $FUNCTION_NAME --s3-bucket naz-lambda --s3-key $ZIP_FILE
           fi
 
-      - name: [Lambda] Wait for Lambda Update to Complete
+      - name: Lambda Wait for Lambda Update to Complete
         if: ${{ matrix.integration.integrationType == 'lambda' }}
         run: |
           FUNCTION_NAME=${{ matrix.integration.function }}
@@ -147,7 +147,7 @@ jobs:
           done
           echo "Lambda function is now Active."
 
-      - name: [Lambda] Ensure Alias Exists and Update
+      - name: Lambda Ensure Alias Exists and Update
         if: ${{ matrix.integration.integrationType == 'lambda' }}
         run: |
           FUNCTION_NAME=${{ matrix.integration.function }}
@@ -172,7 +172,7 @@ jobs:
 
           echo "Alias '$ALIAS_NAME' now points to version $VERSION"
 
-      - name: [Lambda] Update API Gateway Integration (Lambda)
+      - name: Lambda Update API Gateway Integration (Lambda)
         if: ${{ matrix.integration.integrationType == 'lambda' }}
         run: |
           API_NAME="${{ matrix.integration.function }}"
@@ -196,7 +196,7 @@ jobs:
             --http-method "$HTTP_METHOD" \
             --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$INTEGRATION_URI\"}]"
 
-      - name: [Lambda] Check and Add Lambda Permission
+      - name: Lambda Check and Add Lambda Permission
         if: ${{ matrix.integration.integrationType == 'lambda' }}
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
@@ -237,7 +237,7 @@ jobs:
       # -------------------------------------
       # HTTP Integration Deployment Steps
       # -------------------------------------
-      - name: [HTTP] Update API Gateway Integration (HTTP)
+      - name: HTTP Update API Gateway Integration (HTTP)
         if: ${{ matrix.integration.integrationType == 'http' }}
         run: |
           # Read the HTTP endpoint from configuration
