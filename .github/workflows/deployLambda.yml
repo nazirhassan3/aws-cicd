@@ -5,7 +5,7 @@ on:
     branches: nazir
     paths:
       - "src/**"
-      - "iac/cloudformation-api.yaml"
+      - "cloudformation-api.yaml"
 
 jobs:
   deploy_dev:
