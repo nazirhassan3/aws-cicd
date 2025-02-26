@@ -1,300 +1,76 @@
-name: Deploy Updated Lambda Functions
+name: Deploy API Gateway & Lambda Integration
 
 on:
   push:
-    branches:
-      - main
+    branches: nazir
+    paths:
+      - "src/**"
+      - "iac/cloudformation-api.yaml"
 
 jobs:
-  detect_changes:
+  deploy_dev:
+    name: Deploy to Dev Environment
     runs-on: ubuntu-latest
-    outputs:
-      functions: ${{ steps.detect.outputs.FUNCTIONS }}
+    env:
+      AWS_REGION: us-east-1
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Detect Changed Lambda Functions
-        id: detect
-        run: |
-          PREVIOUS_COMMIT=${{ github.event.before }}
-          if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
-            PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
-          fi
-
-          echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
-
-          if [ -z "$PREVIOUS_COMMIT" ]; then
-            CHANGED_FILES=$(git ls-files | grep '^src/' || true)
-          else
-            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/' || true)
-          fi
-
-          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) | map(.) // []')
-
-            # Ensure proper JSON output
-            if [ -z "$CHANGED_FUNCTIONS" ] || [ "$CHANGED_FUNCTIONS" = "null" ]; then
-              CHANGED_FUNCTIONS="[]"
-            fi
-
-          echo "Detected changed Lambda functions: $CHANGED_FUNCTIONS"
-          echo "FUNCTIONS=$CHANGED_FUNCTIONS" >> "$GITHUB_OUTPUT"
-
-      - name: Debug Git History
-        run: |
-          git log --oneline -n 5
-          echo "Previous Commit: ${{ github.event.before }}"
-          echo "Current Commit: ${{ github.sha }}"
-
-      - name: Debug JSON Output
-        run: |
-          echo "Raw JSON Output: '${{ steps.detect.outputs.functions }}'"
-
-  deploy:
-    needs: detect_changes
-    if: needs.detect_changes.outputs.functions != '[]'
-    strategy:
-      matrix:
-        function: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Install Dependencies
+      - name: Validate CloudFormation Template
         run: |
-          cd src/${{ matrix.function }}
-          if [ -f "package.json" ]; then npm install; fi
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt -t .; fi
+          aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
 
-      - name: Package Lambda Function
+      - name: Deploy CloudFormation Stack to Dev
         run: |
-          cd src/${{ matrix.function }}
-          zip -r ../../${{ matrix.function }}.zip .
+          aws cloudformation deploy \
+            --stack-name MyManagedAPIStack-Dev \
+            --template-file cloudformation-api.yaml \
+            --parameter-overrides \
+              ApiName=MyManagedAPI-Dev \
+              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:dev \
+              HtmlEndpoint=https://www.example.com/index.html \
+              StageName=dev \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
 
-      - name: Upload to S3
-        run: |
-          aws s3 cp ${{ matrix.function }}.zip s3://naz-lambda/
+  deploy_prod:
+    name: Deploy to Prod Environment
+    runs-on: ubuntu-latest
+    environment:
+      name: Production # This environment must be protected (set up in your GitHub repo settings)
+    needs: deploy_dev
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Deploy Lambda Function (Create or Update)
-        run: |
-          FUNCTION_NAME=${{ matrix.function }}
-          BUCKET_NAME=naz-lambda
-          ZIP_FILE="${FUNCTION_NAME}.zip"
-          cd src/${{ matrix.function }}
-          if [ -f "package.json" ]; then
-            RUNTIME="nodejs18.x" #change to X
-          else
-            RUNTIME="python3.13"
-          fi
-          HANDLER="lambda_function.lambda_handler"  
-          ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
-          echo "Checking if Lambda function $FUNCTION_NAME exists..."
-          FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
-          if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
-            echo "Function does not exist. Creating..."
-            aws lambda create-function \
-              --function-name $FUNCTION_NAME \
-              --runtime $RUNTIME \
-              --role $ROLE_ARN \
-              --handler $HANDLER \
-              --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
-              --timeout 10 \
-              --memory-size 128
-          else
-            echo "Function exists. Updating..."
-            aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
-          fi
-
-      - name: Wait for Lambda Update to Complete
-        run: |
-          FUNCTION_NAME=${{ matrix.function }}
-          echo "Waiting for Lambda function $FUNCTION_NAME to be in Active state..."
-          STATUS=""
-          while [[ "$STATUS" != "Active" ]]; do
-            sleep 5
-            STATUS=$(aws lambda get-function-configuration --function-name $FUNCTION_NAME --query "State" --output text)
-            echo "Current Status: $STATUS"
-          done
-          echo "Lambda function is now Active."
-
-      - name: Ensure Alias Exists and Update
-        run: |
-          FUNCTION_NAME=${{ matrix.function }}
-          ALIAS_NAME="dev"
-          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
-
-          ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
-
-          if [[ -z "$ALIAS_EXISTS" ]]; then
-            echo "Alias '$ALIAS_NAME' does not exist. Creating it..."
-            aws lambda create-alias \
-              --function-name $FUNCTION_NAME \
-              --name $ALIAS_NAME \
-              --function-version $VERSION
-          else
-            echo "Alias '$ALIAS_NAME' exists. Updating it..."
-            aws lambda update-alias \
-              --function-name $FUNCTION_NAME \
-              --name $ALIAS_NAME \
-              --function-version $VERSION
-          fi
-
-          echo "Alias '$ALIAS_NAME' now points to version $VERSION"
-
-      # - name: Configure AWS Credentials
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     aws-region: us-west-1
-      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      # - name: Copy S3 Object to Target Region
-      #   run: |
-      #     SOURCE_BUCKET=naz-lambda
-      #     DEST_BUCKET=naz-lambda-west
-      #     FUNCTION_NAME=${{ matrix.function }}
-      #     ZIP_FILE="${FUNCTION_NAME}.zip"
-      #     LAMBDA_REGION="us-west-1"
-      #     SOURCE_REGION="us-east-1"
-
-      #     echo "Copying $ZIP_FILE from $SOURCE_BUCKET ($SOURCE_REGION) to $DEST_BUCKET ($LAMBDA_REGION)..."
-
-      #     aws s3 cp s3://$SOURCE_BUCKET/$ZIP_FILE s3://$DEST_BUCKET/$ZIP_FILE --source-region $SOURCE_REGION --region $LAMBDA_REGION
-
-      # - name: Deploy Lambda Function
-      #   run: |
-      #     FUNCTION_NAME=${{ matrix.function }}
-      #     BUCKET_NAME=naz-lambda-west
-      #     ZIP_FILE="${FUNCTION_NAME}.zip"
-      #     cd src/${{ matrix.function }}
-      #     if [ -f "package.json" ]; then
-      #       RUNTIME="nodejs18.x"
-      #     else
-      #       RUNTIME="python3.13"
-      #     fi
-      #     HANDLER="lambda_handler"  # Change based on your function's entry point
-      #     ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
-      #     echo "Checking if Lambda function $FUNCTION_NAME exists..."
-      #     FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
-      #     if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
-      #       echo "Function does not exist. Creating..."
-      #       aws lambda create-function \
-      #         --function-name $FUNCTION_NAME \
-      #         --runtime $RUNTIME \
-      #         --role $ROLE_ARN \
-      #         --handler $HANDLER \
-      #         --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
-      #         --timeout 10 \
-      #         --memory-size 128
-      #     else
-      #       echo "Function exists. Updating..."
-      #       aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
-      #     fi
-
-      #      echo "Publishing new version..."
-      #     VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
-      #     echo "Latest Version: $VERSION"
-
-      #     echo "Updating dev alias to version $VERSION..."
-      #     aws lambda update-alias \
-      #       --function-name $FUNCTION_NAME \
-      #       --name dev \
-      #       --function-version $VERSION
-
-      - name: Update API Gateway Integration for Dev
-        run: |
-          # Retrieve API Gateway ID for your dev API (adjust API name as needed)
-          API_NAME="${{ matrix.function }}"  
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
-          if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
-            echo "ERROR: REST API '$API_NAME' not found."
-            exit 1
-          fi
-          echo "Found API Gateway ID: $API_ID"
-
-          RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
-          HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
-
-          # Build integration URI using the dev alias
-          FUNCTION_ARN=$(aws lambda get-function --function-name "${{ matrix.function }}" --query "Configuration.FunctionArn" --output text)
-          INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}:\${stageVariables.lambdaAlias}/invocations"
-          echo "Updating API Gateway integration URI to: $INTEGRATION_URI"
-
-          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-          FUNCTION_NAME="${FUNCTION_ARN}:\${stageVariables.lambdaAlias}"
-          echo "FUNCTION_NAME: $FUNCTION_NAME"
-
-          # aws lambda add-permission \
-          #   --function-name "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev" \
-          #   --source-arn "arn:aws:execute-api:us-east-1:443370673783:c6uxh6ofe7/*/GET/" \
-          #   --principal apigateway.amazonaws.com \
-          #   --statement-id a0671108-934a-4f32-bd79-b038511456a0 \
-          #   --action lambda:InvokeFunction
-
-          aws apigateway update-integration \
-            --rest-api-id "$API_ID" \
-            --resource-id "$RESOURCE_ID" \
-            --http-method "$HTTP_METHOD" \
-            --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$INTEGRATION_URI\"}]" \
-
-      - name: Check and Add Lambda Permission
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-          FUNCTION_NAME="${{ matrix.function }}"
-          AWS_REGION=us-east-1
-          ALIAS=dev
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
-          LAMBDA_ARN="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}:${ALIAS}"
-          echo "Lambda ARN: $LAMBDA_ARN"
-          SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
-          # Try to get the current policy for the Lambda function
-          POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)
-          STATEMENT_ID=${{ matrix.function }}-dev  
-          if [ -z "$POLICY" ]; then
-            echo "No existing policy found. Adding permission..."
-            aws lambda add-permission \
-              --function-name "$LAMBDA_ARN" \
-              --statement-id "$STATEMENT_ID" \
-              --action lambda:InvokeFunction \
-              --principal apigateway.amazonaws.com \
-              --source-arn "$SOURCE_ARN" \
-              --region "$AWS_REGION"
-          else
-            # Extract the policy document and check for the statement ID
-            EXISTS=$(echo "$POLICY" | jq -r --arg sid "$STATEMENT_ID" '.Policy | fromjson | .Statement[] | select(.Sid==$sid) | .Sid' 2>/dev/null)
-            if [ "$EXISTS" == "$STATEMENT_ID" ]; then
-              echo "Permission with StatementId '$STATEMENT_ID' already exists for $LAMBDA_ARN."
-            else
-              echo "Permission with StatementId '$STATEMENT_ID' does not exist. Adding permission..."
-              aws lambda add-permission \
-                --function-name "$LAMBDA_ARN" \
-                --statement-id "$STATEMENT_ID" \
-                --action lambda:InvokeFunction \
-                --principal apigateway.amazonaws.com \
-                --source-arn "$SOURCE_ARN" \
-                --region "$AWS_REGION"
-            fi
-          fi
-
-      - name: Deploy API Gateway Dev
-        run: |
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ matrix.function }}'].id" --output text)
-          echo "Retrieved API_ID: '$API_ID'"
-          aws apigateway create-deployment --rest-api-id $API_ID --stage-name dev
-
-      - name: Trigger API Gateway Deployment Approval
-        uses: benc-uk/workflow-dispatch@v1
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          workflow: "approve-and-deploy.yml"
-          token: ${{ secrets.PAT_TOKEN }}
-          inputs: '{"function": "${{ matrix.function }}"}'
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Validate CloudFormation Template
+        run: |
+          aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
+
+      - name: Deploy CloudFormation Stack to Prod
+        run: |
+          aws cloudformation deploy \
+            --stack-name MyManagedAPIStack-Prod \
+            --template-file cloudformation-api.yaml \
+            --parameter-overrides \
+              ApiName=MyManagedAPI-Prod \
+              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:prod \
+              HtmlEndpoint=https://www.example.com/index.html \
+              StageName=prod \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
