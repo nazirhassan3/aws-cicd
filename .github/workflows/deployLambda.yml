@@ -237,6 +237,33 @@ jobs:
       # -------------------------------------
       # HTTP Integration Deployment Steps
       # -------------------------------------
+      - name: Check/Create API Gateway for HTTP Integration
+        if: ${{ matrix.integration.integrationType == 'http' }}
+        id: create_http_api
+        run: |
+          API_NAME="${{ matrix.integration.function }}"
+          # Attempt to locate an existing API Gateway
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
+          if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
+            echo "API Gateway '$API_NAME' not found. Creating a new API Gateway..."
+            NEW_API_ID=$(aws apigateway create-rest-api --name "$API_NAME" --query 'id' --output text)
+            echo "Created API Gateway with ID: $NEW_API_ID"
+            # Retrieve the root resource ID for the newly created API
+            ROOT_RESOURCE_ID=$(aws apigateway get-resources --rest-api-id $NEW_API_ID --query "items[?path=='/'].id" --output text)
+            echo "Root Resource ID: $ROOT_RESOURCE_ID"
+            # Create a GET method for the root resource
+            aws apigateway put-method --rest-api-id $NEW_API_ID --resource-id $ROOT_RESOURCE_ID --http-method GET --authorization-type "NONE"
+            # Read the HTTP endpoint from file
+            HTTP_ENDPOINT=$(cat src/${{ matrix.integration.function }}/http_endpoint.txt | tr -d '\r\n')
+            # Set up the integration with the HTTP endpoint
+            aws apigateway put-integration --rest-api-id $NEW_API_ID --resource-id $ROOT_RESOURCE_ID --http-method GET --type HTTP --integration-http-method GET --uri "$HTTP_ENDPOINT"
+            # Set the API_ID variable to the new API ID for subsequent steps
+            API_ID=$NEW_API_ID
+          else
+            echo "Found existing API Gateway with ID: $API_ID"
+          fi
+          echo "API_ID=$API_ID" >> $GITHUB_OUTPUT
+
       - name: HTTP Update API Gateway Integration (HTTP)
         if: ${{ matrix.integration.integrationType == 'http' }}
         run: |
@@ -249,16 +276,15 @@ jobs:
           echo "Using HTTP endpoint: $HTTP_ENDPOINT"
 
           API_NAME="${{ matrix.integration.function }}"
+          # Retrieve API_ID (either from the previous step or via lookup)
           API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
           if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
             echo "ERROR: REST API '$API_NAME' not found."
             exit 1
           fi
-          echo "Found API Gateway ID: $API_ID"
-
+          echo "Using API Gateway ID: $API_ID"
           RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
-          HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
-
+          HTTP_METHOD=$(aws apigateway get-method --rest-API-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
           echo "Updating API Gateway integration URI to point directly to the HTTP endpoint..."
           aws apigateway update-integration \
             --rest-api-id "$API_ID" \
