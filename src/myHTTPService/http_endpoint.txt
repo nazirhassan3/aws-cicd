@@ -1,1 +1,1 @@
-https://dummyjson.com/users
+https://dummyjson.com/products
