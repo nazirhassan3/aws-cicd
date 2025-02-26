@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  API Gateway REST API with two integrations:
+    - /lambda: integrates with a Lambda function (AWS_PROXY)
+    - /html: integrates with an external HTTP endpoint
+
+Parameters:
+  ApiName:
+    Type: String
+    Description: The name of the API Gateway API.
+  LambdaFunctionArn:
+    Type: String
+    Description: ARN of the Lambda function to integrate.
+  HtmlEndpoint:
+    Type: String
+    Description: The external endpoint for the /html resource.
+  StageName:
+    Type: String
+    Description: The deployment stage name (e.g., dev, prod).
+
+Resources:
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Ref ApiName
+      Description: "API Gateway managed via CloudFormation from GitHub"
+
+  LambdaResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: lambda
+      RestApiId: !Ref RestApi
+
+  LambdaMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref LambdaResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub >
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations
+      MethodResponses:
+        - StatusCode: 200
+
+  HtmlResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: html
+      RestApiId: !Ref RestApi
+
+  HtmlMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref HtmlResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: GET
+        Type: HTTP
+        Uri: !Ref HtmlEndpoint
+      MethodResponses:
+        - StatusCode: 200
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: [LambdaMethod, HtmlMethod]
+    Properties:
+      RestApiId: !Ref RestApi
+      StageName: !Ref StageName
+
+Outputs:
+  ApiUrl:
+    Description: "Base URL for the API Gateway"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
