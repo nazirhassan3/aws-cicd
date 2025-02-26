@@ -35,7 +35,7 @@ jobs:
             --template-file cloudformation-api.yaml \
             --parameter-overrides \
               ApiName=MyManagedAPI-Dev \
-              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:dev \
+              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:helloUser:dev \
               HtmlEndpoint=https://www.example.com/index.html \
               StageName=dev \
             --capabilities CAPABILITY_NAMED_IAM \
@@ -69,7 +69,7 @@ jobs:
             --template-file cloudformation-api.yaml \
             --parameter-overrides \
               ApiName=MyManagedAPI-Prod \
-              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:prod \
+              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:helloUser:prod \
               HtmlEndpoint=https://www.example.com/index.html \
               StageName=prod \
             --capabilities CAPABILITY_NAMED_IAM \
