@@ -284,7 +284,7 @@ jobs:
           fi
           echo "Using API Gateway ID: $API_ID"
           RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
-          HTTP_METHOD=$(aws apigateway get-method --rest-API-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
+          HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
           echo "Updating API Gateway integration URI to point directly to the HTTP endpoint..."
           aws apigateway update-integration \
             --rest-api-id "$API_ID" \
