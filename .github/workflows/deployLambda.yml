@@ -1,286 +1,76 @@
-name: Deploy Updated Lambda and HTTP Integrations
+name: Deploy API Gateway & Lambda Integration
 
 on:
   push:
-    branches:
-      - main
+    branches: nazir
+    paths:
+      - "src/**"
+      - "iac/cloudformation-api.yaml"
 
 jobs:
-  detect_changes:
+  deploy_dev:
+    name: Deploy to Dev Environment
     runs-on: ubuntu-latest
-    outputs:
-      functions: ${{ steps.detect.outputs.FUNCTIONS }}
+    env:
+      AWS_REGION: us-east-1
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Detect Changed Functions and Integration Types
-        id: detect
-        run: |
-          # Get the previous commit hash (fallback to HEAD^ if not available)
-          PREVIOUS_COMMIT=${{ github.event.before }}
-          if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
-            PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
-          fi
-
-          echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
-
-          if [ -z "$PREVIOUS_COMMIT" ]; then
-            CHANGED_FILES=$(git ls-files | grep '^src/' || true)
-          else
-            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/' || true)
-          fi
-
-          # Extract function directories from changed files (assumes src/<function>/...)
-          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u)
-          echo "Changed function folders: $CHANGED_FUNCTIONS"
-
-          # Build a JSON array with objects: { "function": "<name>", "integrationType": "<type>" }
-          INTEGRATIONS="["
-          for f in $CHANGED_FUNCTIONS; do
-            # If integration_type.txt exists, read its content; otherwise default to "lambda"
-            if [ -f "src/$f/integration_type.txt" ]; then
-              TYPE=$(cat "src/$f/integration_type.txt" | tr -d '\r\n')
-            else
-              TYPE="lambda"
-            fi
-            INTEGRATIONS="$INTEGRATIONS{\"function\":\"$f\", \"integrationType\":\"$TYPE\"},"
-          done
-          # Remove trailing comma (if any) and close the JSON array
-          INTEGRATIONS="${INTEGRATIONS%,}]"
-
-          echo "Detected integrations: $INTEGRATIONS"
-          echo "FUNCTIONS=$INTEGRATIONS" >> "$GITHUB_OUTPUT"
-
-      - name: Debug Git History
-        run: |
-          git log --oneline -n 5
-          echo "Previous Commit: ${{ github.event.before }}"
-          echo "Current Commit: ${{ github.sha }}"
-
-      - name: Debug JSON Output
-        run: |
-          echo "Raw JSON Output: '${{ steps.detect.outputs.FUNCTIONS }}'"
-
-  deploy:
-    needs: detect_changes
-    if: needs.detect_changes.outputs.functions != '[]'
-    strategy:
-      matrix:
-        integration: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # -------------------------------------
-      # Lambda Integration Deployment Steps
-      # -------------------------------------
-      - name: Lambda Install Dependencies
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
+      - name: Validate CloudFormation Template
         run: |
-          cd src/${{ matrix.integration.function }}
-          if [ -f "package.json" ]; then npm install; fi
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt -t .; fi
+          aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
 
-      - name: Lambda Package Lambda Function
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
+      - name: Deploy CloudFormation Stack to Dev
         run: |
-          cd src/${{ matrix.integration.function }}
-          zip -r ../../${{ matrix.integration.function }}.zip .
+          aws cloudformation deploy \
+            --stack-name MyManagedAPIStack-Dev \
+            --template-file cloudformation-api.yaml \
+            --parameter-overrides \
+              ApiName=MyManagedAPI-Dev \
+              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:dev \
+              HtmlEndpoint=https://www.example.com/index.html \
+              StageName=dev \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
 
-      - name: Lambda Upload to S3
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
-        run: |
-          aws s3 cp ${{ matrix.integration.function }}.zip s3://naz-lambda/
+  deploy_prod:
+    name: Deploy to Prod Environment
+    runs-on: ubuntu-latest
+    environment:
+      name: Production # This environment must be protected (set up in your GitHub repo settings)
+    needs: deploy_dev
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Lambda Deploy Lambda Function (Create or Update)
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
-        run: |
-          FUNCTION_NAME=${{ matrix.integration.function }}
-          BUCKET_NAME=naz-lambda
-          ZIP_FILE="${FUNCTION_NAME}.zip"
-          cd src/${{ matrix.integration.function }}
-          if [ -f "package.json" ]; then
-            RUNTIME="nodejs18.x" # change to desired Node.js runtime if needed
-          else
-            RUNTIME="python3.13"
-          fi
-          HANDLER="lambda_function.lambda_handler"  
-          ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
-          echo "Checking if Lambda function $FUNCTION_NAME exists..."
-          FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
-          if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
-            echo "Function does not exist. Creating..."
-            aws lambda create-function \
-              --function-name $FUNCTION_NAME \
-              --runtime $RUNTIME \
-              --role $ROLE_ARN \
-              --handler $HANDLER \
-              --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
-              --timeout 10 \
-              --memory-size 128
-          else
-            echo "Function exists. Updating..."
-            aws lambda update-function-code --function-name $FUNCTION_NAME --s3-bucket naz-lambda --s3-key $ZIP_FILE
-          fi
-
-      - name: Lambda Wait for Lambda Update to Complete
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
-        run: |
-          FUNCTION_NAME=${{ matrix.integration.function }}
-          echo "Waiting for Lambda function $FUNCTION_NAME to be in Active state..."
-          STATUS=""
-          while [[ "$STATUS" != "Active" ]]; do
-            sleep 5
-            STATUS=$(aws lambda get-function-configuration --function-name $FUNCTION_NAME --query "State" --output text)
-            echo "Current Status: $STATUS"
-          done
-          echo "Lambda function is now Active."
-
-      - name: Lambda Ensure Alias Exists and Update
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
-        run: |
-          FUNCTION_NAME=${{ matrix.integration.function }}
-          ALIAS_NAME="dev"
-          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
-
-          ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
-
-          if [[ -z "$ALIAS_EXISTS" ]]; then
-            echo "Alias '$ALIAS_NAME' does not exist. Creating it..."
-            aws lambda create-alias \
-              --function-name $FUNCTION_NAME \
-              --name $ALIAS_NAME \
-              --function-version $VERSION
-          else
-            echo "Alias '$ALIAS_NAME' exists. Updating it..."
-            aws lambda update-alias \
-              --function-name $FUNCTION_NAME \
-              --name $ALIAS_NAME \
-              --function-version $VERSION
-          fi
-
-          echo "Alias '$ALIAS_NAME' now points to version $VERSION"
-
-      - name: Lambda Update API Gateway Integration (Lambda)
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
-        run: |
-          API_NAME="${{ matrix.integration.function }}"
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
-          if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
-            echo "ERROR: REST API '$API_NAME' not found."
-            exit 1
-          fi
-          echo "Found API Gateway ID: $API_ID"
-
-          RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
-          HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
-
-          FUNCTION_ARN=$(aws lambda get-function --function-name "${{ matrix.integration.function }}" --query "Configuration.FunctionArn" --output text)
-          INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}:\${stageVariables.lambdaAlias}/invocations"
-          echo "Updating API Gateway integration URI to: $INTEGRATION_URI"
-
-          aws apigateway update-integration \
-            --rest-api-id "$API_ID" \
-            --resource-id "$RESOURCE_ID" \
-            --http-method "$HTTP_METHOD" \
-            --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$INTEGRATION_URI\"}]"
-
-      - name: Lambda Check and Add Lambda Permission
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-          FUNCTION_NAME=${{ matrix.integration.function }}
-          AWS_REGION=us-east-1
-          ALIAS=dev
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
-          LAMBDA_ARN="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}:${ALIAS}"
-          echo "Lambda ARN: $LAMBDA_ARN"
-          SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
-          STATEMENT_ID=${{ matrix.integration.function }}-dev  
-          POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)
-          if [ -z "$POLICY" ]; then
-            echo "No existing policy found. Adding permission..."
-            aws lambda add-permission \
-              --function-name "$LAMBDA_ARN" \
-              --statement-id "$STATEMENT_ID" \
-              --action lambda:InvokeFunction \
-              --principal apigateway.amazonaws.com \
-              --source-arn "$SOURCE_ARN" \
-              --region "$AWS_REGION"
-          else
-            EXISTS=$(echo "$POLICY" | jq -r --arg sid "$STATEMENT_ID" '.Policy | fromjson | .Statement[] | select(.Sid==$sid) | .Sid' 2>/dev/null)
-            if [ "$EXISTS" == "$STATEMENT_ID" ]; then
-              echo "Permission with StatementId '$STATEMENT_ID' already exists for $LAMBDA_ARN."
-            else
-              echo "Permission with StatementId '$STATEMENT_ID' does not exist. Adding permission..."
-              aws lambda add-permission \
-                --function-name "$LAMBDA_ARN" \
-                --statement-id "$STATEMENT_ID" \
-                --action lambda:InvokeFunction \
-                --principal apigateway.amazonaws.com \
-                --source-arn "$SOURCE_ARN" \
-                --region "$AWS_REGION"
-            fi
-          fi
-
-      # -------------------------------------
-      # HTTP Integration Deployment Steps
-      # -------------------------------------
-      - name: HTTP Update API Gateway Integration (HTTP)
-        if: ${{ matrix.integration.integrationType == 'http' }}
-        run: |
-          # Read the HTTP endpoint from configuration
-          if [ ! -f "src/${{ matrix.integration.function }}/http_endpoint.txt" ]; then
-            echo "ERROR: http_endpoint.txt not found in src/${{ matrix.integration.function }}"
-            exit 1
-          fi
-          HTTP_ENDPOINT=$(cat src/${{ matrix.integration.function }}/http_endpoint.txt | tr -d '\r\n')
-          echo "Using HTTP endpoint: $HTTP_ENDPOINT"
-
-          API_NAME="${{ matrix.integration.function }}"
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
-          if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
-            echo "ERROR: REST API '$API_NAME' not found."
-            exit 1
-          fi
-          echo "Found API Gateway ID: $API_ID"
-
-          RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
-          HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
-
-          echo "Updating API Gateway integration URI to point directly to the HTTP endpoint..."
-          aws apigateway update-integration \
-            --rest-api-id "$API_ID" \
-            --resource-id "$RESOURCE_ID" \
-            --http-method "$HTTP_METHOD" \
-            --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$HTTP_ENDPOINT\"}]"
-
-      # -------------------------------------
-      # Common API Gateway Deployment Steps (for both integration types)
-      # -------------------------------------
-      - name: Deploy API Gateway Dev
-        if: ${{ matrix.integration.integrationType == 'lambda' || matrix.integration.integrationType == 'http' }}
-        run: |
-          API_NAME="${{ matrix.integration.function }}"
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id" --output text)
-          echo "Retrieved API_ID: '$API_ID'"
-          aws apigateway create-deployment --rest-api-id $API_ID --stage-name dev
-
-      - name: Trigger API Gateway Deployment Approval
-        if: ${{ matrix.integration.integrationType == 'lambda' || matrix.integration.integrationType == 'http' }}
-        uses: benc-uk/workflow-dispatch@v1
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          workflow: "approve-and-deploy.yml"
-          token: ${{ secrets.PAT_TOKEN }}
-          inputs: '{"function": "${{ matrix.integration.function }}"}'
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Validate CloudFormation Template
+        run: |
+          aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
+
+      - name: Deploy CloudFormation Stack to Prod
+        run: |
+          aws cloudformation deploy \
+            --stack-name MyManagedAPIStack-Prod \
+            --template-file cloudformation-api.yaml \
+            --parameter-overrides \
+              ApiName=MyManagedAPI-Prod \
+              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:prod \
+              HtmlEndpoint=https://www.example.com/index.html \
+              StageName=prod \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
