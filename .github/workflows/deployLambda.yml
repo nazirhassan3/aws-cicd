@@ -4,38 +4,36 @@ on:
   push:
     branches: nazir
     paths:
-      - "cloudformation-api.yaml"
+      - "iac/cloudformation-api.yaml"
       - "src/**"
   workflow_dispatch:
     inputs:
       deploy_type:
-        description: "Choose deployment type: 'update' to update an existing API, or 'new_api' to create a new API."
+        description: "Deployment type: 'update' to update an existing API or 'new_api' to deploy a new API."
         required: true
         default: "update"
         type: choice
         options:
           - update
           - new_api
-      # Parameters for new API deployment (used only when deploy_type == "new_api")
-      api_stack_name:
-        description: "Stack name for the new API."
-        required: false
-        default: "MyNewAPIStack"
-      api_name:
-        description: "API name for the new API."
-        required: false
-        default: "MyNewAPI"
       stage:
-        description: "Deployment stage (e.g. dev or prod)."
-        required: false
+        description: "Deployment stage (e.g., dev or prod)"
+        required: true
         default: "dev"
-      lambda_function_arn:
-        description: "Lambda function ARN with alias for the new API (if using Lambda integration)."
+      api_name:
+        description: "Name of the API to deploy"
         required: false
+        default: "MyManagedAPI"
+      lambda_function_arn:
+        description: "Lambda function ARN to integrate (include alias, e.g., :dev or :prod)"
+        required: true
       html_endpoint:
-        description: "HTML endpoint for the new API (if not using Lambda integration)."
+        description: "HTTP endpoint for HTML integration"
         required: false
         default: "https://www.example.com/index.html"
+      authorizer_lambda_arn:
+        description: "Lambda function ARN for the custom authorizer"
+        required: true
 
 env:
   AWS_REGION: us-east-1
@@ -58,18 +56,19 @@ jobs:
 
       - name: Validate CloudFormation Template
         run: |
-          aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
+          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region ${{ env.AWS_REGION }}
 
-      - name: Deploy CloudFormation Stack (Existing API - Dev)
+      - name: Deploy CloudFormation Stack (Dev)
         run: |
           aws cloudformation deploy \
             --stack-name MyManagedAPIStack-Dev \
-            --template-file cloudformation-api.yaml \
+            --template-file iac/cloudformation-api.yaml \
             --parameter-overrides \
-              ApiName=MyManagedAPI-Dev \
-              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:dev \
-              HtmlEndpoint=https://www.example.com/index.html \
-              StageName=dev \
+              ApiName=${{ github.event.inputs.api_name }}-Dev \
+              LambdaFunctionArn=${{ github.event.inputs.lambda_function_arn }} \
+              HtmlEndpoint=${{ github.event.inputs.html_endpoint }} \
+              StageName=${{ github.event.inputs.stage }} \
+              AuthorizerLambdaArn=${{ github.event.inputs.authorizer_lambda_arn }} \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
 
@@ -90,50 +89,29 @@ jobs:
 
       - name: Validate CloudFormation Template
         run: |
-          aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
+          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region ${{ env.AWS_REGION }}
 
       - name: Deploy New API via CloudFormation
         run: |
-          # Retrieve inputs from workflow_dispatch
-          STACK_NAME="${{ github.event.inputs.api_stack_name }}"
-          API_NAME="${{ github.event.inputs.api_name }}"
-          STAGE_NAME="${{ github.event.inputs.stage }}"
-          LAMBDA_ARN="${{ github.event.inputs.lambda_function_arn }}"
-          HTML_ENDPOINT="${{ github.event.inputs.html_endpoint }}"
+          STACK_NAME="${{ github.event.inputs.api_name }}-Stack-${{ github.event.inputs.stage }}"
+          aws cloudformation deploy \
+            --stack-name "$STACK_NAME" \
+            --template-file iac/cloudformation-api.yaml \
+            --parameter-overrides \
+              ApiName=${{ github.event.inputs.api_name }} \
+              LambdaFunctionArn=${{ github.event.inputs.lambda_function_arn }} \
+              HtmlEndpoint=${{ github.event.inputs.html_endpoint }} \
+              StageName=${{ github.event.inputs.stage }} \
+              AuthorizerLambdaArn=${{ github.event.inputs.authorizer_lambda_arn }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
 
-          # Check if a Lambda ARN was provided
-          if [ -z "$LAMBDA_ARN" ]; then
-            echo "Deploying new API with HTTP integration only."
-            aws cloudformation deploy \
-              --stack-name "$STACK_NAME" \
-              --template-file cloudformation-api.yaml \
-              --parameter-overrides \
-                ApiName="$API_NAME" \
-                HtmlEndpoint="$HTML_ENDPOINT" \
-                StageName="$STAGE_NAME" \
-              --capabilities CAPABILITY_NAMED_IAM \
-              --region ${{ env.AWS_REGION }}
-          else
-            echo "Deploying new API with Lambda integration."
-            aws cloudformation deploy \
-              --stack-name "$STACK_NAME" \
-              --template-file cloudformation-api.yaml \
-              --parameter-overrides \
-                ApiName="$API_NAME" \
-                LambdaFunctionArn="$LAMBDA_ARN" \
-                HtmlEndpoint="$HTML_ENDPOINT" \
-                StageName="$STAGE_NAME" \
-              --capabilities CAPABILITY_NAMED_IAM \
-              --region ${{ env.AWS_REGION }}
-          fi
-
-  # (Optional) You can also add a separate prod deployment job that attaches to a protected environment for manual approval.
   deploy_prod:
     name: Deploy to Prod Environment
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_type == 'update' && github.event.inputs.stage == 'prod'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.stage == 'prod'
     runs-on: ubuntu-latest
     environment:
-      name: Production # Must be set up in GitHub repository settings with required reviewers.
+      name: Production # This environment must be configured in GitHub with required reviewers for manual approval.
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -147,17 +125,18 @@ jobs:
 
       - name: Validate CloudFormation Template
         run: |
-          aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
+          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region ${{ env.AWS_REGION }}
 
       - name: Deploy CloudFormation Stack to Prod
         run: |
           aws cloudformation deploy \
             --stack-name MyManagedAPIStack-Prod \
-            --template-file cloudformation-api.yaml \
+            --template-file iac/cloudformation-api.yaml \
             --parameter-overrides \
-              ApiName=MyManagedAPI-Prod \
-              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:prod \
-              HtmlEndpoint=https://www.example.com/index.html \
-              StageName=prod \
+              ApiName=${{ github.event.inputs.api_name }}-Prod \
+              LambdaFunctionArn=${{ github.event.inputs.lambda_function_arn }} \
+              HtmlEndpoint=${{ github.event.inputs.html_endpoint }} \
+              StageName=${{ github.event.inputs.stage }} \
+              AuthorizerLambdaArn=${{ github.event.inputs.authorizer_lambda_arn }} \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
