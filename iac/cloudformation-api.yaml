@@ -36,8 +36,7 @@ Resources:
       Type: TOKEN
       RestApiId: !Ref RestApi
       IdentitySource: method.request.header.Authorization
-      AuthorizerUri: !Sub >
-        arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${AuthorizerLambdaArn}/invocations
+      AuthorizerUri: !Sub arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${AuthorizerLambdaArn}/invocations
       AuthorizerResultTtlInSeconds: 300
 
   # Create a resource for Lambda integration (/lambda)
