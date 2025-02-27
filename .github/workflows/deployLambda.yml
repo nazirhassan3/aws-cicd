@@ -1,18 +1,50 @@
-name: Deploy API Gateway & Lambda Integration
+name: Deploy API Gateway via CloudFormation
 
 on:
   push:
     branches: nazir
     paths:
-      - "src/**"
       - "cloudformation-api.yaml"
+      - "src/**"
+  workflow_dispatch:
+    inputs:
+      deploy_type:
+        description: "Choose deployment type: 'update' to update an existing API, or 'new_api' to create a new API."
+        required: true
+        default: "update"
+        type: choice
+        options:
+          - update
+          - new_api
+      # Parameters for new API deployment (used only when deploy_type == "new_api")
+      api_stack_name:
+        description: "Stack name for the new API."
+        required: false
+        default: "MyNewAPIStack"
+      api_name:
+        description: "API name for the new API."
+        required: false
+        default: "MyNewAPI"
+      stage:
+        description: "Deployment stage (e.g. dev or prod)."
+        required: false
+        default: "dev"
+      lambda_function_arn:
+        description: "Lambda function ARN with alias for the new API (if using Lambda integration)."
+        required: false
+      html_endpoint:
+        description: "HTML endpoint for the new API (if not using Lambda integration)."
+        required: false
+        default: "https://www.example.com/index.html"
+
+env:
+  AWS_REGION: us-east-1
 
 jobs:
-  deploy_dev:
-    name: Deploy to Dev Environment
+  deploy_existing:
+    name: Update Existing API (Dev)
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_type == 'update')
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: us-east-1
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -28,25 +60,80 @@ jobs:
         run: |
           aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
 
-      - name: Deploy CloudFormation Stack to Dev
+      - name: Deploy CloudFormation Stack (Existing API - Dev)
         run: |
           aws cloudformation deploy \
             --stack-name MyManagedAPIStack-Dev \
             --template-file cloudformation-api.yaml \
             --parameter-overrides \
               ApiName=MyManagedAPI-Dev \
-              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:helloUser:dev \
+              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:dev \
               HtmlEndpoint=https://www.example.com/index.html \
               StageName=dev \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
 
+  deploy_new_api:
+    name: Deploy New API
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_type == 'new_api'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Validate CloudFormation Template
+        run: |
+          aws cloudformation validate-template --template-body file://cloudformation-api.yaml --region ${{ env.AWS_REGION }}
+
+      - name: Deploy New API via CloudFormation
+        run: |
+          # Retrieve inputs from workflow_dispatch
+          STACK_NAME="${{ github.event.inputs.api_stack_name }}"
+          API_NAME="${{ github.event.inputs.api_name }}"
+          STAGE_NAME="${{ github.event.inputs.stage }}"
+          LAMBDA_ARN="${{ github.event.inputs.lambda_function_arn }}"
+          HTML_ENDPOINT="${{ github.event.inputs.html_endpoint }}"
+
+          # Check if a Lambda ARN was provided
+          if [ -z "$LAMBDA_ARN" ]; then
+            echo "Deploying new API with HTTP integration only."
+            aws cloudformation deploy \
+              --stack-name "$STACK_NAME" \
+              --template-file cloudformation-api.yaml \
+              --parameter-overrides \
+                ApiName="$API_NAME" \
+                HtmlEndpoint="$HTML_ENDPOINT" \
+                StageName="$STAGE_NAME" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region ${{ env.AWS_REGION }}
+          else
+            echo "Deploying new API with Lambda integration."
+            aws cloudformation deploy \
+              --stack-name "$STACK_NAME" \
+              --template-file cloudformation-api.yaml \
+              --parameter-overrides \
+                ApiName="$API_NAME" \
+                LambdaFunctionArn="$LAMBDA_ARN" \
+                HtmlEndpoint="$HTML_ENDPOINT" \
+                StageName="$STAGE_NAME" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region ${{ env.AWS_REGION }}
+          fi
+
+  # (Optional) You can also add a separate prod deployment job that attaches to a protected environment for manual approval.
   deploy_prod:
     name: Deploy to Prod Environment
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_type == 'update' && github.event.inputs.stage == 'prod'
     runs-on: ubuntu-latest
     environment:
-      name: Production # This environment must be protected (set up in your GitHub repo settings)
-    needs: deploy_dev
+      name: Production # Must be set up in GitHub repository settings with required reviewers.
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -69,7 +156,7 @@ jobs:
             --template-file cloudformation-api.yaml \
             --parameter-overrides \
               ApiName=MyManagedAPI-Prod \
-              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:helloUser:prod \
+              LambdaFunctionArn=arn:aws:lambda:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:MyLambdaFunction:prod \
               HtmlEndpoint=https://www.example.com/index.html \
               StageName=prod \
             --capabilities CAPABILITY_NAMED_IAM \
