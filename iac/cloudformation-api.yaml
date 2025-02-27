@@ -1,8 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  API Gateway REST API with two integrations:
-    - /lambda: integrates with a Lambda function (AWS_PROXY)
-    - /html: integrates with an external HTTP endpoint
+  API Gateway REST API with multiple resources, Lambda integration with a custom authorizer,
+  and an HTTP integration. The template is parameterized to allow creation of new APIs with any name.
 
 Parameters:
   ApiName:
@@ -10,21 +9,38 @@ Parameters:
     Description: The name of the API Gateway API.
   LambdaFunctionArn:
     Type: String
-    Description: ARN of the Lambda function to integrate.
+    Description: ARN of the Lambda function to integrate with for the /lambda resource.
   HtmlEndpoint:
     Type: String
-    Description: The external endpoint for the /html resource.
+    Description: The external URL for the /html resource.
   StageName:
     Type: String
     Description: The deployment stage name (e.g., dev, prod).
+  AuthorizerLambdaArn:
+    Type: String
+    Description: ARN of the Lambda function that will serve as the custom authorizer.
 
 Resources:
+  # Create the REST API
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Ref ApiName
-      Description: "API Gateway managed via CloudFormation from GitHub"
+      Description: "API Gateway managed via CloudFormation from GitHub CI/CD"
 
+  # Define a custom Lambda authorizer
+  CustomAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: "MyLambdaAuthorizer"
+      Type: TOKEN
+      RestApiId: !Ref RestApi
+      IdentitySource: method.request.header.Authorization
+      AuthorizerUri: !Sub >
+        arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerLambdaArn}/invocations
+      AuthorizerResultTtlInSeconds: 300
+
+  # Create a resource for Lambda integration (/lambda)
   LambdaResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -32,13 +48,15 @@ Resources:
       PathPart: lambda
       RestApiId: !Ref RestApi
 
+  # Create a method for /lambda using AWS_PROXY integration and protecting it with the custom authorizer
   LambdaMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref RestApi
       ResourceId: !Ref LambdaResource
-      HttpMethod: GET
-      AuthorizationType: NONE
+      HttpMethod: ANY
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref CustomAuthorizer
       Integration:
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
@@ -47,6 +65,7 @@ Resources:
       MethodResponses:
         - StatusCode: 200
 
+  # Create a resource for HTTP integration (/html)
   HtmlResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -54,6 +73,7 @@ Resources:
       PathPart: html
       RestApiId: !Ref RestApi
 
+  # Create a GET method for /html
   HtmlMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -68,6 +88,7 @@ Resources:
       MethodResponses:
         - StatusCode: 200
 
+  # Deployment: create/update a deployment in the specified stage
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn: [LambdaMethod, HtmlMethod]
