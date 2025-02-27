@@ -20,15 +20,15 @@ jobs:
           - api_name: "helloWorld"
             stack_name: "helloWorld-Dev"
             stage: "dev"
-            lambda_function_arn: "arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:helloWorld:dev"
+            lambda_function_arn: "arn:aws:lambda:us-east-1:443370673783:function:helloWorld:dev"
             html_endpoint: "https://customerA.example.com/index.html"
-            authorizer_lambda_arn: "arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:auth"
+            authorizer_lambda_arn: "arn:aws:lambda:us-east-1:443370673783:function:auth"
           - api_name: "helloUser"
             stack_name: "helloUser-Dev"
             stage: "dev"
-            lambda_function_arn: "arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:helloUser:dev"
+            lambda_function_arn: "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev"
             html_endpoint: "https://customerB.example.com/index.html"
-            authorizer_lambda_arn: "arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:auth"
+            authorizer_lambda_arn: "arn:aws:lambda:us-east-1:443370673783:function:auth"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
