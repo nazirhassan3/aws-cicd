@@ -1,11 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Parameterized API Gateway REST API.
-  This template defines:
-    - A REST API with resources and methods.
-    - A Lambda integration (e.g. for /lambda).
-    - An HTTP integration (e.g. for /html).
-    - A custom Lambda authorizer.
+  API Gateway REST API with multiple resources, Lambda integration with a custom authorizer,
+  and an HTTP integration. The template is parameterized to allow creation of new APIs with any name.
 
 Parameters:
   ApiName:
@@ -13,29 +9,26 @@ Parameters:
     Description: The name of the API Gateway API.
   LambdaFunctionArn:
     Type: String
-    Description: ARN of the Lambda function for the /lambda integration.
+    Description: ARN of the Lambda function to integrate with for the /lambda resource.
   HtmlEndpoint:
     Type: String
-    Description: URL for the /html integration. If empty, the resource is not created.
-    Default: ""
+    Description: The external URL for the /html resource.
   StageName:
     Type: String
-    Description: Deployment stage (e.g., dev, prod).
+    Description: The deployment stage name (e.g., dev, prod).
   AuthorizerLambdaArn:
     Type: String
-    Description: ARN of the Lambda function for the custom authorizer (base ARN without alias).
-
-Conditions:
-  CreateHtmlResource: !Not [!Equals [!Ref HtmlEndpoint, ""]]
+    Description: ARN of the Lambda function that will serve as the custom authorizer.
 
 Resources:
+  # Create the REST API
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Ref ApiName
-      Description: "API managed via CloudFormation and GitHub Actions"
+      Description: "API Gateway managed via CloudFormation from GitHub CI/CD"
 
-  # Custom Authorizer (always created)
+  # Define a custom Lambda authorizer
   CustomAuthorizer:
     Type: AWS::ApiGateway::Authorizer
     Properties:
@@ -43,10 +36,10 @@ Resources:
       Type: TOKEN
       RestApiId: !Ref RestApi
       IdentitySource: method.request.header.Authorization
-      AuthorizerUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerLambdaArn}/invocations"
+      AuthorizerUri: !Sub arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${AuthorizerLambdaArn}/invocations
       AuthorizerResultTtlInSeconds: 300
 
-  # Resource for Lambda integration (/lambda)
+  # Create a resource for Lambda integration (/lambda)
   LambdaResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -54,6 +47,7 @@ Resources:
       PathPart: lambda
       RestApiId: !Ref RestApi
 
+  # Create a method for /lambda using AWS_PROXY integration and protecting it with the custom authorizer
   LambdaMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -65,22 +59,21 @@ Resources:
       Integration:
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations"
+        Uri: !Sub arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations
       MethodResponses:
         - StatusCode: 200
 
-  # Optional Resource for HTML integration (/html)
+  # Create a resource for HTTP integration (/html)
   HtmlResource:
     Type: AWS::ApiGateway::Resource
-    Condition: CreateHtmlResource
     Properties:
       ParentId: !GetAtt RestApi.RootResourceId
       PathPart: html
       RestApiId: !Ref RestApi
 
+  # Create a GET method for /html
   HtmlMethod:
     Type: AWS::ApiGateway::Method
-    Condition: CreateHtmlResource
     Properties:
       RestApiId: !Ref RestApi
       ResourceId: !Ref HtmlResource
@@ -93,12 +86,10 @@ Resources:
       MethodResponses:
         - StatusCode: 200
 
+  # Deployment: create/update a deployment in the specified stage
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - LambdaMethod
-      - CustomAuthorizer
-      - !If [CreateHtmlResource, HtmlMethod, !Ref "AWS::NoValue"]
+    DependsOn: [LambdaMethod, HtmlMethod]
     Properties:
       RestApiId: !Ref RestApi
       StageName: !Ref StageName
@@ -106,4 +97,4 @@ Resources:
 Outputs:
   ApiUrl:
     Description: "Base URL for the API Gateway"
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+    Value: !Sub "https://${RestApi}.execute-api.us-east-1.amazonaws.com/${StageName}"
