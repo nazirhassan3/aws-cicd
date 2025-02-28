@@ -1,50 +1,38 @@
-name: Deploy API Gateway via CloudFormation
+name: Deploy Multiple APIs with Dynamic Paths
 
 on:
   push:
     branches: nazir
     paths:
-      - "iac/cloudformation-api.yaml"
+      - "iac/params/apis.json"
+      - "iac/params/dynamic_paths.json"
+      - "iac/cloudformation-api.base.yaml"
+      - "iac/generate_resources.py"
       - "src/**"
   workflow_dispatch:
-    inputs:
-      deploy_type:
-        description: "Deployment type: 'update' to update an existing API or 'new_api' to create a new API."
-        required: true
-        default: "update"
-        type: choice
-        options:
-          - update
-          - new_api
-      stage:
-        description: "Deployment stage (e.g., dev or prod)"
-        required: true
-        default: "dev"
-      api_name:
-        description: "Name of the API to deploy"
-        required: false
-        default: "MyManagedAPI"
-      lambda_function_arn:
-        description: "Lambda function ARN for the integration (include alias if using Lambda integration; leave empty if not used)"
-        required: false
-        default: ""
-      html_endpoint:
-        description: "HTTP endpoint for HTML integration (leave empty if not used)"
-        required: false
-        default: ""
-      authorizer_lambda_arn:
-        description: "Lambda function ARN for the custom authorizer (base ARN without alias)"
-        required: false
-        default: ""
-
-env:
-  AWS_REGION: us-east-1
 
 jobs:
-  deploy_existing:
-    name: Update Existing API (Dev)
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_type == 'update')
+  set-matrix:
+    name: Set Matrix from JSON Parameters
     runs-on: ubuntu-latest
+    outputs:
+      api_matrix: ${{ steps.set_matrix.outputs.api_matrix }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      - name: Read API Configurations from JSON
+        id: set_matrix
+        run: |
+          MATRIX=$(jq -c '.apis' iac/params/apis.json)
+          echo "api_matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  deploy_apis_dev:
+    name: Deploy APIs (Dev)
+    needs: set-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        api_config: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -52,58 +40,50 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
           aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
 
+      - name: Update Lambda Code (Dev)
+        if: ${{ matrix.api_config.lambda_code_path != "" }}
+        run: |
+          echo "Packaging Lambda code for API: ${{ matrix.api_config.api_name }}"
+          cd "${{ matrix.api_config.lambda_code_path }}"
+          zip -r function.zip .
+          aws lambda update-function-code --function-name "${{ matrix.api_config.lambda_function_arn }}" --zip-file fileb://function.zip --region us-east-1
+          cd -
+
+      - name: Generate Dynamic Resources
+        run: |
+          python iac/generate_resources.py > iac/generated_resources.json
+
+      - name: Combine Base Template with Dynamic Resources
+        run: |
+          cat iac/cloudformation-api.base.yaml iac/generated_resources.json > iac/cloudformation-api.yaml
+
       - name: Validate CloudFormation Template
         run: |
-          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region ${{ env.AWS_REGION }}
+          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region us-east-1
 
       - name: Deploy CloudFormation Stack (Dev)
         run: |
+          echo "Deploying API: ${{ matrix.api_config.api_name }} with stack: ${{ matrix.api_config.stack_name }}"
           aws cloudformation deploy \
-            --stack-name "MyManagedAPIStack-Dev" \
+            --stack-name "${{ matrix.api_config.stack_name }}" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides "ApiName=${{ github.event.inputs.api_name }}-Dev LambdaFunctionArn=${{ github.event.inputs.lambda_function_arn }} HtmlEndpoint=${{ github.event.inputs.html_endpoint }} StageName=${{ github.event.inputs.stage }} AuthorizerLambdaArn=${{ github.event.inputs.authorizer_lambda_arn }}" \
+            --parameter-overrides "ApiName=${{ matrix.api_config.api_name }}" "LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }}" "HtmlEndpoint=${{ matrix.api_config.html_endpoint }}" "StageName=${{ matrix.api_config.stage }}" "AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }}" \
             --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
+            --region us-east-1
 
-  deploy_new_api:
-    name: Deploy New API
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_type == 'new_api'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-region: ${{ env.AWS_REGION }}
-          aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
-          aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-
-      - name: Validate CloudFormation Template
-        run: |
-          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region ${{ env.AWS_REGION }}
-
-      - name: Deploy New API via CloudFormation
-        run: |
-          STACK_NAME="${{ github.event.inputs.api_name }}-Stack-${{ github.event.inputs.stage }}"
-          aws cloudformation deploy \
-            --stack-name "$STACK_NAME" \
-            --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides "ApiName=${{ github.event.inputs.api_name }} LambdaFunctionArn=${{ github.event.inputs.lambda_function_arn }} HtmlEndpoint=${{ github.event.inputs.html_endpoint }} StageName=${{ github.event.inputs.stage }} AuthorizerLambdaArn=${{ github.event.inputs.authorizer_lambda_arn }}" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
-
-  deploy_prod:
-    name: Deploy to Prod Environment
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.stage == 'prod'
+  deploy_apis_prod:
+    name: Deploy APIs to Prod
+    needs: set-matrix
     runs-on: ubuntu-latest
     environment:
-      name: Production # Configure this environment in your GitHub repository settings with required reviewers for manual approval.
+      name: Production # Must be configured in GitHub settings with manual approval.
+    strategy:
+      matrix:
+        api_config: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -111,19 +91,37 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
           aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
 
+      - name: Update Lambda Code (Prod)
+        if: ${{ matrix.api_config.lambda_code_path != "" }}
+        run: |
+          echo "Packaging Lambda code for Prod API: ${{ matrix.api_config.api_name }}"
+          cd "${{ matrix.api_config.lambda_code_path }}"
+          zip -r function.zip .
+          aws lambda update-function-code --function-name "${{ matrix.api_config.lambda_function_arn }}" --zip-file fileb://function.zip --region us-east-1
+          cd -
+
+      - name: Generate Dynamic Resources
+        run: |
+          python iac/generate_resources.py > iac/generated_resources.json
+
+      - name: Combine Base Template with Dynamic Resources
+        run: |
+          cat iac/cloudformation-api.base.yaml iac/generated_resources.json > iac/cloudformation-api.yaml
+
       - name: Validate CloudFormation Template
         run: |
-          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region ${{ env.AWS_REGION }}
+          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region us-east-1
 
-      - name: Deploy CloudFormation Stack to Prod
+      - name: Deploy CloudFormation Stack (Prod)
         run: |
+          echo "Deploying Prod API: ${{ matrix.api_config.api_name }}"
           aws cloudformation deploy \
-            --stack-name "MyManagedAPIStack-Prod" \
+            --stack-name "${{ matrix.api_config.stack_name }}-Prod" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides "ApiName=${{ github.event.inputs.api_name }}-Prod LambdaFunctionArn=${{ github.event.inputs.lambda_function_arn }} HtmlEndpoint=${{ github.event.inputs.html_endpoint }} StageName=${{ github.event.inputs.stage }} AuthorizerLambdaArn=${{ github.event.inputs.authorizer_lambda_arn }}" \
+            --parameter-overrides "ApiName=${{ matrix.api_config.api_name }}-Prod" "LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }}" "HtmlEndpoint=${{ matrix.api_config.html_endpoint }}" "StageName=prod" "AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }}" \
             --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
+            --region us-east-1
