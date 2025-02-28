@@ -1,7 +1,10 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   Base API Gateway REST API template.
-  This template defines the API, custom authorizer, a fixed /lambda resource, and an optional /html resource.
+  This template defines common resources:
+    - A custom Lambda authorizer.
+    - A /lambda resource with a default integration.
+    - An optional /html resource.
 
 Parameters:
   ApiName:
@@ -48,7 +51,6 @@ Resources:
       PathPart: lambda
       RestApiId: !Ref RestApi
 
-  # Fixed Lambda integration resource example (could be used for a default path)
   DefaultLambdaMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -87,4 +89,18 @@ Resources:
       MethodResponses:
         - StatusCode: 200
 
-  # Note: Dynamic resources (e.g., /users, /orders, etc.) will be appended via the generated JSON.
+  # The deployment resource; dynamic resources will be merged later.
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - DefaultLambdaMethod
+      - CustomAuthorizer
+      - !If [CreateHtmlResource, HtmlMethod, !Ref "AWS::NoValue"]
+    Properties:
+      RestApiId: !Ref RestApi
+      StageName: !Ref StageName
+
+Outputs:
+  ApiUrl:
+    Description: "Base URL for the API Gateway"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"

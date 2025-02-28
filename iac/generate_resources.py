@@ -1,32 +1,16 @@
 import json
 
-# For this example, assume we have a file 'iac/params/dynamic_paths.json'
-# with content like:
-# {
-#   "resources": [
-#     {
-#       "pathPart": "users",
-#       "httpMethod": "GET",
-#       "integrationType": "AWS_PROXY",
-#       "lambdaFunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:UserFunction:dev"
-#     },
-#     {
-#       "pathPart": "orders",
-#       "httpMethod": "POST",
-#       "integrationType": "HTTP",
-#       "endpoint": "https://api.example.com/orders"
-#     }
-#   ]
-# }
+# Load dynamic paths from a JSON file
 with open('iac/params/dynamic_paths.json', 'r') as f:
     data = json.load(f)
 
 resources = {}
+
 for res in data.get("resources", []):
-    # Create a logical ID (capitalize first letter of pathPart)
-    logical_id = f"{res['pathPart'].capitalize()}Resource"
-    method_id = f"{res['pathPart'].capitalize()}Method"
-    
+    # Create a logical ID for the resource (capitalize first letter of pathPart)
+    logical_id = ''.join(word.capitalize() for word in res["pathPart"].split('-')) + "Resource"
+    method_id = ''.join(word.capitalize() for word in res["pathPart"].split('-')) + "Method"
+
     resources[logical_id] = {
         "Type": "AWS::ApiGateway::Resource",
         "Properties": {
@@ -35,7 +19,7 @@ for res in data.get("resources", []):
             "RestApiId": { "Ref": "RestApi" }
         }
     }
-    
+
     if res["integrationType"] == "AWS_PROXY":
         integration = {
             "IntegrationHttpMethod": "POST",
