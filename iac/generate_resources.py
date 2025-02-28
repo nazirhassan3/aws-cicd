@@ -1,16 +1,14 @@
 import json
+import yaml
 
-# Load dynamic paths from a JSON file
 with open('iac/params/dynamic_paths.json', 'r') as f:
     data = json.load(f)
 
 resources = {}
-
 for res in data.get("resources", []):
-    # Create a logical ID for the resource (capitalize first letter of pathPart)
-    logical_id = ''.join(word.capitalize() for word in res["pathPart"].split('-')) + "Resource"
-    method_id = ''.join(word.capitalize() for word in res["pathPart"].split('-')) + "Method"
-
+    logical_id = f"{res['pathPart'].capitalize()}Resource"
+    method_id = f"{res['pathPart'].capitalize()}Method"
+    
     resources[logical_id] = {
         "Type": "AWS::ApiGateway::Resource",
         "Properties": {
@@ -19,7 +17,7 @@ for res in data.get("resources", []):
             "RestApiId": { "Ref": "RestApi" }
         }
     }
-
+    
     if res["integrationType"] == "AWS_PROXY":
         integration = {
             "IntegrationHttpMethod": "POST",
@@ -47,4 +45,5 @@ for res in data.get("resources", []):
         }
     }
 
-print(json.dumps({"Resources": resources}, indent=2))
+# Output YAML instead of JSON
+print(yaml.dump({"Resources": resources}, default_flow_style=False))
