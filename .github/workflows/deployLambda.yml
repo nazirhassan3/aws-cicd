@@ -71,7 +71,7 @@ jobs:
           aws cloudformation deploy \
             --stack-name "${{ matrix.api_config.stack_name }}" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides "ApiName=${{ matrix.api_config.api_name }}" "LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }}" "HtmlEndpoint=${{ matrix.api_config.html_endpoint }}" "StageName=${{ matrix.api_config.stage }}" "AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }}" \
+            --parameter-overrides "ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} StageName=${{ matrix.api_config.stage }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-east-1
 
@@ -80,7 +80,7 @@ jobs:
     needs: set-matrix
     runs-on: ubuntu-latest
     environment:
-      name: Production # Must be configured in GitHub settings with manual approval.
+      name: Production # Ensure this environment is configured in GitHub with manual approval.
     strategy:
       matrix:
         api_config: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
@@ -122,6 +122,6 @@ jobs:
           aws cloudformation deploy \
             --stack-name "${{ matrix.api_config.stack_name }}-Prod" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides "ApiName=${{ matrix.api_config.api_name }}-Prod" "LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }}" "HtmlEndpoint=${{ matrix.api_config.html_endpoint }}" "StageName=prod" "AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }}" \
+            --parameter-overrides "ApiName=${{ matrix.api_config.api_name }}-Prod LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} StageName=prod AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-east-1
