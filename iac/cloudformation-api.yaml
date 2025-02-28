@@ -98,7 +98,6 @@ Resources:
     DependsOn:
       - LambdaMethod
       - CustomAuthorizer
-      - !If [CreateHtmlResource, HtmlMethod, !Ref "AWS::NoValue"]
     Properties:
       RestApiId: !Ref RestApi
       StageName: !Ref StageName
