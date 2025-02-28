@@ -58,11 +58,11 @@ jobs:
 
       - name: Generate Dynamic Resources
         run: |
-          python iac/generate_resources.py > iac/generated_resources.json
+          python iac/generate_resources.py > iac/generated_resources.yaml
 
       - name: Combine Base Template with Dynamic Resources
         run: |
-          cat iac/cloudformation-api.base.yaml iac/generated_resources.json > iac/cloudformation-api.yaml
+          cat iac/cloudformation-api.base.yaml iac/generated_resources.yaml > iac/cloudformation-api.yaml
 
       - name: Validate CloudFormation Template
         run: |
