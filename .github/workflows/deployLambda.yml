@@ -43,7 +43,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Update Lambda Code (Dev)
-        if: ${{ matrix.api_config.lambda_code_path != "" }}
+        if: ${{ matrix.api_config.lambda_code_path != '' }}
         run: |
           echo "Packaging Lambda code for API: ${{ matrix.api_config.api_name }}"
           cd "${{ matrix.api_config.lambda_code_path }}"
@@ -93,7 +93,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Update Lambda Code (Prod)
-        if: ${{ matrix.api_config.lambda_code_path != "" }}
+        if: ${{ matrix.api_config.lambda_code_path != '' }}
         run: |
           echo "Packaging Lambda code for Prod API: ${{ matrix.api_config.api_name }}"
           cd "${{ matrix.api_config.lambda_code_path }}"
