@@ -1,11 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Parameterized API Gateway REST API.
-  This template defines:
-    - A REST API with resources and methods.
-    - A Lambda integration (e.g. for /lambda).
-    - An HTTP integration (e.g. for /html).
-    - A custom Lambda authorizer.
+  Base API Gateway REST API template.
+  This template defines the API, custom authorizer, a fixed /lambda resource, and an optional /html resource.
 
 Parameters:
   ApiName:
@@ -16,14 +12,14 @@ Parameters:
     Description: ARN of the Lambda function for the /lambda integration.
   HtmlEndpoint:
     Type: String
-    Description: URL for the /html integration. If empty, the resource is not created.
+    Description: URL for the /html integration. Leave empty if not used.
     Default: ""
   StageName:
     Type: String
     Description: Deployment stage (e.g., dev, prod).
   AuthorizerLambdaArn:
     Type: String
-    Description: ARN of the Lambda function for the custom authorizer (base ARN without alias).
+    Description: ARN of the Lambda function for the custom authorizer (base ARN only).
 
 Conditions:
   CreateHtmlResource: !Not [!Equals [!Ref HtmlEndpoint, ""]]
@@ -33,9 +29,8 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Ref ApiName
-      Description: "API managed via CloudFormation and GitHub Actions"
+      Description: "API Gateway managed via CloudFormation and GitHub Actions"
 
-  # Custom Authorizer (always created)
   CustomAuthorizer:
     Type: AWS::ApiGateway::Authorizer
     Properties:
@@ -46,19 +41,19 @@ Resources:
       AuthorizerUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerLambdaArn}/invocations"
       AuthorizerResultTtlInSeconds: 300
 
-  # Resource for Lambda integration (/lambda)
-  LambdaResource:
+  LambdaBaseResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       ParentId: !GetAtt RestApi.RootResourceId
       PathPart: lambda
       RestApiId: !Ref RestApi
 
-  LambdaMethod:
+  # Fixed Lambda integration resource example (could be used for a default path)
+  DefaultLambdaMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref RestApi
-      ResourceId: !Ref LambdaResource
+      ResourceId: !Ref LambdaBaseResource
       HttpMethod: ANY
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref CustomAuthorizer
@@ -69,7 +64,6 @@ Resources:
       MethodResponses:
         - StatusCode: 200
 
-  # Optional Resource for HTML integration (/html)
   HtmlResource:
     Type: AWS::ApiGateway::Resource
     Condition: CreateHtmlResource
@@ -93,16 +87,4 @@ Resources:
       MethodResponses:
         - StatusCode: 200
 
-  ApiDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - LambdaMethod
-      - CustomAuthorizer
-    Properties:
-      RestApiId: !Ref RestApi
-      StageName: !Ref StageName
-
-Outputs:
-  ApiUrl:
-    Description: "Base URL for the API Gateway"
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+  # Note: Dynamic resources (e.g., /users, /orders, etc.) will be appended via the generated JSON.
