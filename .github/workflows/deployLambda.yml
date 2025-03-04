@@ -132,7 +132,7 @@ jobs:
               RUNTIME="python3.13"
             fi
             HANDLER="lambda_function.lambda_handler"  
-            ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
+            ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"  # Make sure this role ARN is in your account and allowed to be passed
             echo "Checking if Lambda function $FUNCTION_NAME exists..."
             FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
             if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
@@ -221,7 +221,8 @@ jobs:
           RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
           HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
           FUNCTION_ARN=$(aws lambda get-function --function-name "$FUNCTION_NAME" --query "Configuration.FunctionArn" --output text)
-          INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}:\${stageVariables.lambdaAlias}/invocations"
+          # Remove stageVariables alias if not used
+          INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}/invocations"
           echo "Updating API Gateway integration URI to: $INTEGRATION_URI"
           aws apigateway update-integration \
             --rest-api-id "$API_ID" \
@@ -335,10 +336,7 @@ jobs:
         if: ${{ matrix.integration.integrationType == 'lambda' || matrix.integration.integrationType == 'http' }}
         run: |
           API_NAME="${{ matrix.integration.function }}"
-          # For Lambda, we stored the ID in create_lambda_api.outputs.API_ID
-          # For HTTP, we stored it in create_http_api.outputs.API_ID
-          # But to keep it simple, we can do another lookup here or unify logic
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id" --output text)
           echo "Retrieved API_ID: '$API_ID'"
           aws apigateway create-deployment --rest-api-id $API_ID --stage-name dev
 
