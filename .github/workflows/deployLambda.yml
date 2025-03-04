@@ -132,7 +132,7 @@ jobs:
               RUNTIME="python3.13"
             fi
             HANDLER="lambda_function.lambda_handler"  
-            ROLE_ARN="arn:aws:iam::111111111111:role/basicLambdaRole"
+            ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
             echo "Checking if Lambda function $FUNCTION_NAME exists..."
             FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
             if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
