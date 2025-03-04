@@ -43,7 +43,7 @@ jobs:
             if [ -f "src/$f/integration_type.txt" ]; then
               TYPE=$(cat "src/$f/integration_type.txt" | tr -d '\r\n')
             else
-              TYPE="lambda"  # Default to lambda if no integration_type.txt
+              TYPE="lambda"
             fi
             INTEGRATIONS="$INTEGRATIONS{\"function\":\"$f\", \"integrationType\":\"$TYPE\"},"
           done
@@ -182,52 +182,23 @@ jobs:
           fi
           echo "Alias '$ALIAS_NAME' now points to version $VERSION"
 
-      - name: Lambda Check/Create API Gateway
-        if: ${{ matrix.integration.integrationType == 'lambda' }}
-        id: create_lambda_api
-        run: |
-          API_NAME="${{ matrix.integration.function }}"
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
-          if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
-            echo "API Gateway '$API_NAME' not found. Creating a new API Gateway..."
-            NEW_API_ID=$(aws apigateway create-rest-api --name "$API_NAME" --query 'id' --output text)
-            echo "Created API Gateway with ID: $NEW_API_ID"
-            ROOT_RESOURCE_ID=$(aws apigateway get-resources --rest-api-id $NEW_API_ID --query "items[?path=='/'].id" --output text)
-            echo "Root Resource ID: $ROOT_RESOURCE_ID"
-            # Create a GET method for the root resource
-            aws apigateway put-method \
-              --rest-api-id $NEW_API_ID \
-              --resource-id $ROOT_RESOURCE_ID \
-              --http-method GET \
-              --authorization-type "NONE"
-            API_ID=$NEW_API_ID
-          else
-            echo "Found existing API Gateway with ID: $API_ID"
-          fi
-          echo "API_ID=$API_ID" >> $GITHUB_OUTPUT
-
       - name: Lambda Update API Gateway Integration (Lambda)
         if: ${{ matrix.integration.integrationType == 'lambda' }}
         run: |
           API_NAME="${{ matrix.integration.function }}"
           FUNCTION_NAME=${{ steps.determine_lambda.outputs.TARGET_FUNCTION }}
-          # Retrieve the API ID from the previous step
-          API_ID=${{ steps.create_lambda_api.outputs.API_ID }}
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
           if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
-            echo "ERROR: REST API '$API_NAME' not found or not created."
+            echo "ERROR: REST API '$API_NAME' not found."
             exit 1
           fi
-          echo "Using API Gateway ID: $API_ID"
+          echo "Found API Gateway ID: $API_ID"
           RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
           HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
           FUNCTION_ARN=$(aws lambda get-function --function-name "$FUNCTION_NAME" --query "Configuration.FunctionArn" --output text)
           INTEGRATION_URI="arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${FUNCTION_ARN}:\${stageVariables.lambdaAlias}/invocations"
           echo "Updating API Gateway integration URI to: $INTEGRATION_URI"
-          aws apigateway update-integration \
-            --rest-api-id "$API_ID" \
-            --resource-id "$RESOURCE_ID" \
-            --http-method "$HTTP_METHOD" \
-            --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$INTEGRATION_URI\"}]"
+          aws apigateway update-integration --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method "$HTTP_METHOD" --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$INTEGRATION_URI\"}]"
 
       - name: Lambda Check and Add Lambda Permission
         if: ${{ matrix.integration.integrationType == 'lambda' }}
@@ -235,7 +206,7 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           FUNCTION_NAME=${{ steps.determine_lambda.outputs.TARGET_FUNCTION }}
           AWS_REGION=us-east-1
-          API_ID=${{ steps.create_lambda_api.outputs.API_ID }}
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ matrix.integration.function }}'].id | [0]" --output text)
           LAMBDA_ARN="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}:dev"
           echo "Lambda ARN: $LAMBDA_ARN"
           SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
@@ -243,26 +214,14 @@ jobs:
           POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)
           if [ -z "$POLICY" ]; then
             echo "No existing policy found. Adding permission..."
-            aws lambda add-permission \
-              --function-name "$LAMBDA_ARN" \
-              --statement-id "$STATEMENT_ID" \
-              --action lambda:InvokeFunction \
-              --principal apigateway.amazonaws.com \
-              --source-arn "$SOURCE_ARN" \
-              --region "$AWS_REGION"
+            aws lambda add-permission --function-name "$LAMBDA_ARN" --statement-id "$STATEMENT_ID" --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "$SOURCE_ARN" --region "$AWS_REGION"
           else
             EXISTS=$(echo "$POLICY" | jq -r --arg sid "$STATEMENT_ID" '.Policy | fromjson | .Statement[] | select(.Sid==$sid) | .Sid' 2>/dev/null)
             if [ "$EXISTS" == "$STATEMENT_ID" ]; then
               echo "Permission with StatementId '$STATEMENT_ID' already exists for $LAMBDA_ARN."
             else
               echo "Permission with StatementId '$STATEMENT_ID' does not exist. Adding permission..."
-              aws lambda add-permission \
-                --function-name "$LAMBDA_ARN" \
-                --statement-id "$STATEMENT_ID" \
-                --action lambda:InvokeFunction \
-                --principal apigateway.amazonaws.com \
-                --source-arn "$SOURCE_ARN" \
-                --region "$AWS_REGION"
+              aws lambda add-permission --function-name "$LAMBDA_ARN" --statement-id "$STATEMENT_ID" --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "$SOURCE_ARN" --region "$AWS_REGION"
             fi
           fi
 
@@ -313,7 +272,7 @@ jobs:
           TARGET_ENDPOINT=${{ steps.determine_http.outputs.TARGET_ENDPOINT }}
           echo "Using HTTP endpoint: $TARGET_ENDPOINT"
           API_NAME="${{ matrix.integration.function }}"
-          API_ID=${{ steps.create_http_api.outputs.API_ID }}
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
           if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
             echo "ERROR: REST API '$API_NAME' not found."
             exit 1
@@ -322,11 +281,7 @@ jobs:
           RESOURCE_ID=$(aws apigateway get-resources --rest-api-id "$API_ID" --query "items[?path=='/'].id" --output text)
           HTTP_METHOD=$(aws apigateway get-method --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method GET --query "httpMethod" --output text || echo "")
           echo "Updating API Gateway integration URI to point directly to the HTTP endpoint..."
-          aws apigateway update-integration \
-            --rest-api-id "$API_ID" \
-            --resource-id "$RESOURCE_ID" \
-            --http-method "$HTTP_METHOD" \
-            --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$TARGET_ENDPOINT\"}]"
+          aws apigateway update-integration --rest-api-id "$API_ID" --resource-id "$RESOURCE_ID" --http-method "$HTTP_METHOD" --patch-operations "[{\"op\": \"replace\", \"path\": \"/uri\", \"value\": \"$TARGET_ENDPOINT\"}]"
 
       # ---------------------------
       # Common API Gateway Deployment Steps (for both types)
@@ -335,10 +290,7 @@ jobs:
         if: ${{ matrix.integration.integrationType == 'lambda' || matrix.integration.integrationType == 'http' }}
         run: |
           API_NAME="${{ matrix.integration.function }}"
-          # For Lambda, we stored the ID in create_lambda_api.outputs.API_ID
-          # For HTTP, we stored it in create_http_api.outputs.API_ID
-          # But to keep it simple, we can do another lookup here or unify logic
-          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id" --output text)
           echo "Retrieved API_ID: '$API_ID'"
           aws apigateway create-deployment --rest-api-id $API_ID --stage-name dev
 
