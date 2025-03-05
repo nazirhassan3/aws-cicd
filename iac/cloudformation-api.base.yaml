@@ -106,7 +106,7 @@ Resources:
       StageName: dev
       RestApiId: !Ref RestApi
       DeploymentId: !Ref ApiDeployment
-      StageVariables:
+      Variables:
         lambdaAlias: !Ref LambdaDevAlias
 
   ProdStage:
@@ -115,7 +115,7 @@ Resources:
       StageName: prod
       RestApiId: !Ref RestApi
       DeploymentId: !Ref ApiDeployment
-      StageVariables:
+      Variables:
         lambdaAlias: !Ref LambdaProdAlias
 
 Outputs:
