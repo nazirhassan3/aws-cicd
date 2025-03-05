@@ -1,7 +1,7 @@
 {
   "apis": [
     {
-      "api_name": "Hello User",
+      "api_name": "Hello_User",
       "stack_name": "CustomerAStack-Dev",
       "stage": "dev",
       "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev",
@@ -10,7 +10,7 @@
       "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth"
     },
     {
-      "api_name": "Hello World",
+      "api_name": "Hello_World",
       "stack_name": "CustomerBStack-Dev",
       "stage": "dev",
       "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld:dev",
