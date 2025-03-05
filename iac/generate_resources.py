@@ -1,11 +1,15 @@
 import json
+import sys
 import yaml
 
-with open('iac/params/dynamic_paths.json', 'r') as f:
+# Use the first command-line argument as the input file; default if not provided.
+input_file = sys.argv[1] if len(sys.argv) > 1 else 'iac/params/current_resource_paths.json'
+
+with open(input_file, 'r') as f:
     data = json.load(f)
 
 resources = {}
-for res in data.get("resources", []):
+for res in data:
     logical_id = f"{res['pathPart'].capitalize()}Resource"
     method_id = f"{res['pathPart'].capitalize()}Method"
     
@@ -45,5 +49,4 @@ for res in data.get("resources", []):
         }
     }
 
-# Output the generated YAML with a top-level "Resources" key.
 print(yaml.dump({"Resources": resources}, default_flow_style=False))
