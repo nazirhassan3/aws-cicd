@@ -7,7 +7,9 @@
       "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev",
       "lambda_code_path": "src/helloUser",
       "html_endpoint": "",
-      "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth"
+      "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
+      "lambda_dev_alias": "dev",
+      "lambda_prod_alias": "prod"
     },
     {
       "api_name": "Hello_World",
@@ -16,7 +18,9 @@
       "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld:dev",
       "lambda_code_path": "src/helloWorld",
       "html_endpoint": "",
-      "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth"
+      "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
+      "lambda_dev_alias": "dev",
+      "lambda_prod_alias": "prod"
     }
   ]
 }

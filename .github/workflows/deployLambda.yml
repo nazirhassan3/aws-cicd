@@ -1,4 +1,4 @@
-name: Deploy Multiple APIs with Dynamic Paths
+name: Deploy APIs with Multi-Stage
 
 on:
   push:
@@ -26,8 +26,8 @@ jobs:
           MATRIX=$(jq -c '.apis' iac/params/apis.json)
           echo "api_matrix=$MATRIX" >> $GITHUB_OUTPUT
 
-  deploy_apis_dev:
-    name: Deploy APIs (Dev)
+  deploy_api:
+    name: Deploy API (Dev & Prod)
     needs: set-matrix
     runs-on: ubuntu-latest
     strategy:
@@ -44,15 +44,15 @@ jobs:
           aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
 
-      - name: Update Lambda Code (Dev)
+      - name: Update Lambda Code
         if: ${{ matrix.api_config.lambda_code_path != '' }}
         run: |
           echo "Packaging Lambda code for API: ${{ matrix.api_config.api_name }}"
           cd "${{ matrix.api_config.lambda_code_path }}"
           zip -r function.zip .
-          # Remove alias/version from the ARN (update-function-code supports only $LATEST)
+          # Extract the base ARN (remove any alias/version)
           BASE_FUNCTION_ARN=$(echo "${{ matrix.api_config.lambda_function_arn }}" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
-          echo "Updating function code for $BASE_FUNCTION_ARN"
+          echo "Updating Lambda function code for $BASE_FUNCTION_ARN"
           aws lambda update-function-code --function-name "$BASE_FUNCTION_ARN" --zip-file fileb://function.zip --region us-east-1
           cd -
 
@@ -62,8 +62,7 @@ jobs:
 
       - name: Merge Base Template with Dynamic Resources
         run: |
-          # Use yq to merge the Resources sections of both YAML files.
-          # Install yq if not already available.
+          # Install yq if not available
           sudo wget https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           yq eval-all '. as $item ireduce ({}; . * $item )' iac/cloudformation-api.base.yaml iac/generated_resources.yaml > iac/cloudformation-api.yaml
 
@@ -71,66 +70,24 @@ jobs:
         run: |
           aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region us-east-1
 
-      - name: Deploy CloudFormation Stack (Dev)
+      - name: Deploy CloudFormation Stack
         run: |
           echo "Deploying API: ${{ matrix.api_config.api_name }} with stack: ${{ matrix.api_config.stack_name }}"
           aws cloudformation deploy \
             --stack-name "${{ matrix.api_config.stack_name }}" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} StageName=${{ matrix.api_config.stage }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} \
+            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} \
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-east-1
 
-  deploy_apis_prod:
-    name: Deploy APIs to Prod
-    needs: set-matrix
+  prod_approval:
+    name: Approve Prod Changes
+    needs: deploy_api
     runs-on: ubuntu-latest
     environment:
-      name: Production # This environment must be configured in GitHub with required reviewers.
-    strategy:
-      matrix:
-        api_config: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
+      name: Production # Configure this environment in GitHub with required reviewers.
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-region: us-east-1
-          aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
-          aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-
-      - name: Update Lambda Code (Prod)
-        if: ${{ matrix.api_config.lambda_code_path != '' }}
-        run: |
-          echo "Packaging Lambda code for Prod API: ${{ matrix.api_config.api_name }}"
-          cd "${{ matrix.api_config.lambda_code_path }}"
-          zip -r function.zip .
-          BASE_FUNCTION_ARN=$(echo "${{ matrix.api_config.lambda_function_arn }}" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
-          echo "Updating function code for $BASE_FUNCTION_ARN"
-          aws lambda update-function-code --function-name "$BASE_FUNCTION_ARN" --zip-file fileb://function.zip --region us-east-1
-          cd -
-
-      - name: Generate Dynamic Resources
-        run: |
-          python iac/generate_resources.py > iac/generated_resources.yaml
-
-      - name: Merge Base Template with Dynamic Resources
-        run: |
-          sudo wget https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
-          yq eval-all '. as $item ireduce ({}; . * $item )' iac/cloudformation-api.base.yaml iac/generated_resources.yaml > iac/cloudformation-api.yaml
-
-      - name: Validate CloudFormation Template
-        run: |
-          aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region us-east-1
-
-      - name: Deploy CloudFormation Stack (Prod)
-        run: |
-          echo "Deploying Prod API: ${{ matrix.api_config.api_name }}"
-          aws cloudformation deploy \
-            --stack-name "${{ matrix.api_config.stack_name }}-Prod" \
-            --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides ApiName=${{ matrix.api_config.api_name }}-Prod LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} StageName=prod AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region us-east-1
+      - name: Manual Approval Step
+        run: echo "Production deployment approved. The API stack has been deployed with both Dev and Prod stages."
