@@ -1,4 +1,4 @@
-name: Deploy APIs with Multi-Stage and Dynamic Resource Paths
+name: Deploy APIs with Multi-Stage
 
 on:
   push:
@@ -25,8 +25,8 @@ jobs:
           MATRIX=$(jq -c '.apis' iac/params/apis.json)
           echo "api_matrix=$MATRIX" >> $GITHUB_OUTPUT
 
-  deploy_apis_dev:
-    name: Deploy APIs (Dev)
+  deploy_api_dev:
+    name: Deploy API (Dev)
     needs: set-matrix
     runs-on: ubuntu-latest
     strategy:
@@ -49,23 +49,22 @@ jobs:
           echo "Packaging Lambda code for API: ${{ matrix.api_config.api_name }}"
           cd "${{ matrix.api_config.lambda_code_path }}"
           zip -r function.zip .
+          # Strip any alias/version from the ARN so that update-function-code works
           BASE_FUNCTION_ARN=$(echo "${{ matrix.api_config.lambda_function_arn }}" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
           echo "Updating Lambda function code for $BASE_FUNCTION_ARN"
           aws lambda update-function-code --function-name "$BASE_FUNCTION_ARN" --zip-file fileb://function.zip --region us-east-1
           cd -
 
-      - name: Write Resource Paths JSON
-        # Write the dynamic resource paths for this API from the matrix to a file.
-        run: |
-          echo '${{ toJson(matrix.api_config.resource_paths) }}' > iac/params/current_resource_paths.json
-
       - name: Generate Dynamic Resources
         run: |
+          # Write the dynamic resource definitions (if provided in the API config)
+          # We assume the API config includes a "resource_paths" key which is an array.
+          echo '${{ toJson(matrix.api_config.resource_paths) }}' > iac/params/current_resource_paths.json
           python iac/generate_resources.py iac/params/current_resource_paths.json > iac/generated_resources.yaml
 
       - name: Merge Base Template with Dynamic Resources
         run: |
-          # Install yq if not available
+          # Install yq if not already installed.
           sudo wget https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           yq eval-all '. as $item ireduce ({}; . * $item )' iac/cloudformation-api.base.yaml iac/generated_resources.yaml > iac/cloudformation-api.yaml
 
@@ -79,16 +78,16 @@ jobs:
           aws cloudformation deploy \
             --stack-name "${{ matrix.api_config.stack_name }}" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} StageName=${{ matrix.api_config.stage }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} \
+            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} \
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-east-1
 
-  deploy_apis_prod:
-    name: Deploy APIs to Prod
+  deploy_api_prod:
+    name: Deploy API (Prod)
     needs: set-matrix
     runs-on: ubuntu-latest
     environment:
-      name: Production # Configure this environment in GitHub with required reviewers.
+      name: Production # Configure the "Production" environment in GitHub with manual approval.
     strategy:
       matrix:
         api_config: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
@@ -114,12 +113,9 @@ jobs:
           aws lambda update-function-code --function-name "$BASE_FUNCTION_ARN" --zip-file fileb://function.zip --region us-east-1
           cd -
 
-      - name: Write Resource Paths JSON
-        run: |
-          echo '${{ toJson(matrix.api_config.resource_paths) }}' > iac/params/current_resource_paths.json
-
       - name: Generate Dynamic Resources
         run: |
+          echo '${{ toJson(matrix.api_config.resource_paths) }}' > iac/params/current_resource_paths.json
           python iac/generate_resources.py iac/params/current_resource_paths.json > iac/generated_resources.yaml
 
       - name: Merge Base Template with Dynamic Resources
@@ -133,17 +129,17 @@ jobs:
 
       - name: Deploy CloudFormation Stack (Prod)
         run: |
-          echo "Deploying Prod API: ${{ matrix.api_config.api_name }}"
+          echo "Deploying API (Prod): ${{ matrix.api_config.api_name }} on stack: ${{ matrix.api_config.stack_name }}"
           aws cloudformation deploy \
-            --stack-name "${{ matrix.api_config.stack_name }}-Prod" \
+            --stack-name "${{ matrix.api_config.stack_name }}" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides ApiName=${{ matrix.api_config.api_name }}-Prod LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} StageName=prod AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} \
+            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} \
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-east-1
 
   prod_approval:
-    name: Approve Prod Deployment
-    needs: deploy_apis_prod
+    name: Prod Approval Gate
+    needs: deploy_api_prod
     runs-on: ubuntu-latest
     environment:
       name: Production
@@ -151,4 +147,4 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
       - name: Manual Approval Step
-        run: echo "Production deployment has been manually approved."
+        run: echo "Production deployment approved. API has been updated."
