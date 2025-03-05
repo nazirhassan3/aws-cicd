@@ -63,9 +63,10 @@ Resources:
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
         # Use a stage variable placeholder; note the double $$ to escape for CloudFormation
-        Uri: !Sub
-          - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}:${LambdaAliasPlaceholder}/invocations"
-          - { "LambdaAliasPlaceholder": "${stageVariables.lambdaAlias}" }
+        # Uri: !Sub
+        #   - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}:${LambdaAliasPlaceholder}/invocations"
+        #   - { "LambdaAliasPlaceholder": "${stageVariables.lambdaAlias}" }
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}:\${stageVariables.lambdaAlias}/invocations"
       MethodResponses:
         - StatusCode: 200
 
