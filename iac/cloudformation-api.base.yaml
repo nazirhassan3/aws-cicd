@@ -1,11 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Base API Gateway REST API template.
-  Defines common resources:
-    - RestApi
-    - CustomAuthorizer
-    - A fixed /lambda resource with a default method
-    - An optional /html resource
+  API Gateway REST API with multiple stages (Dev and Prod) using stage variables.
+  The API uses a Lambda integration whose alias is selected based on the stage.
 
 Parameters:
   ApiName:
@@ -13,14 +9,17 @@ Parameters:
     Description: The name of the API Gateway API.
   LambdaFunctionArn:
     Type: String
-    Description: ARN of the Lambda function for the /lambda integration.
+    Description: Base ARN of the Lambda function (without alias).
+  LambdaDevAlias:
+    Type: String
+    Description: Lambda alias to use in Dev stage.
+  LambdaProdAlias:
+    Type: String
+    Description: Lambda alias to use in Prod stage.
   HtmlEndpoint:
     Type: String
     Description: URL for the /html integration. Leave empty if not used.
     Default: ""
-  StageName:
-    Type: String
-    Description: Deployment stage (e.g., dev, prod).
   AuthorizerLambdaArn:
     Type: String
     Description: ARN of the Lambda function for the custom authorizer (base ARN only).
@@ -33,7 +32,7 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Ref ApiName
-      Description: "API Gateway managed via CloudFormation and GitHub Actions"
+      Description: "API with Dev and Prod stages managed via CloudFormation"
 
   CustomAuthorizer:
     Type: AWS::ApiGateway::Authorizer
@@ -52,7 +51,7 @@ Resources:
       PathPart: lambda
       RestApiId: !Ref RestApi
 
-  DefaultLambdaMethod:
+  LambdaMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref RestApi
@@ -63,7 +62,8 @@ Resources:
       Integration:
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations"
+        # Use stage variable to select the alias. At runtime, API Gateway replaces ${stageVariables.lambdaAlias}
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}:${stageVariables.lambdaAlias}/invocations"
       MethodResponses:
         - StatusCode: 200
 
@@ -89,3 +89,38 @@ Resources:
         Uri: !Ref HtmlEndpoint
       MethodResponses:
         - StatusCode: 200
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - LambdaMethod
+      - CustomAuthorizer
+      - !If [CreateHtmlResource, HtmlMethod, !Ref "AWS::NoValue"]
+    Properties:
+      RestApiId: !Ref RestApi
+
+  DevStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: dev
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      StageVariables:
+        lambdaAlias: !Ref LambdaDevAlias
+
+  ProdStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: prod
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      StageVariables:
+        lambdaAlias: !Ref LambdaProdAlias
+
+Outputs:
+  ApiUrlDev:
+    Description: "Dev API URL"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/dev"
+  ApiUrlProd:
+    Description: "Prod API URL"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
