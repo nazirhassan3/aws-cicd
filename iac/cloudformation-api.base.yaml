@@ -63,7 +63,7 @@ Resources:
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
         # Use stage variable to select the alias. At runtime, API Gateway replaces ${stageVariables.lambdaAlias}
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}:${stageVariables.lambdaAlias}/invocations"
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}:$${stageVariables.lambdaAlias}/invocations"
       MethodResponses:
         - StatusCode: 200
 
