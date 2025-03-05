@@ -45,5 +45,5 @@ for res in data.get("resources", []):
         }
     }
 
-# Output YAML instead of JSON
+# Output the generated YAML with a top-level "Resources" key.
 print(yaml.dump({"Resources": resources}, default_flow_style=False))
