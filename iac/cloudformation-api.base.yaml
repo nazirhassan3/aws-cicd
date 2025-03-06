@@ -23,6 +23,10 @@ Parameters:
   LambdaProdAlias:
     Type: String
     Description: Lambda alias to use in the Prod stage.
+  LiteralAliasPlaceholder:
+    Type: String
+    Default: "${stageVariables.lambdaAlias}"
+    Description: "Literal placeholder for the stage variable"
 
 Conditions:
   CreateHtmlResource: !Not [!Equals [!Ref HtmlEndpoint, ""]]
@@ -66,13 +70,7 @@ Resources:
         # Uri: !Sub
         #   - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}:${LambdaAliasPlaceholder}/invocations"
         #   - { "LambdaAliasPlaceholder": "${stageVariables.lambdaAlias}" }
-        Uri: !Join
-          - ""
-          - - "arn:aws:apigateway:"
-            - !Ref "AWS::Region"
-            - ":lambda:path/2015-03-31/functions/"
-            - !Ref LambdaFunctionArn
-            - ":${stageVariables.lambdaAlias}/invocations"
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}:${LiteralAliasPlaceholder}/invocations"
       MethodResponses:
         - StatusCode: 200
 
