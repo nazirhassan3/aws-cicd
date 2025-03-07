@@ -41,6 +41,24 @@
           "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld:dev"
         }
       ]
+    },
+    {
+      "api_name": "Test_New",
+      "stack_name": "NewFunc",
+      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:testNew:dev",
+      "lambda_code_path": "src/testNew",
+      "html_endpoint": "",
+      "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
+      "lambda_dev_alias": "dev",
+      "lambda_prod_alias": "prod",
+      "resource_paths": [
+        {
+          "pathPart": "items",
+          "httpMethod": "GET",
+          "integrationType": "AWS_PROXY",
+          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:testNew:dev"
+        }
+      ]
     }
   ]
 }
