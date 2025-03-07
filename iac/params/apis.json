@@ -1,7 +1,7 @@
 {
   "apis": [
     {
-      "api_name": "Hello_User",
+      "api_name": "helloUser",
       "stack_name": "CustomerAStack",
       "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev",
       "lambda_code_path": "src/helloUser",
@@ -25,7 +25,7 @@
       ]
     },
     {
-      "api_name": "Hello_World",
+      "api_name": "helloWorld",
       "stack_name": "CustomerBStack",
       "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld:dev",
       "lambda_code_path": "src/helloWorld",
@@ -43,7 +43,7 @@
       ]
     },
     {
-      "api_name": "Test_New",
+      "api_name": "testNew",
       "stack_name": "NewFunc",
       "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:testNew:dev",
       "lambda_code_path": "src/testNew",
