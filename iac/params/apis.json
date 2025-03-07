@@ -20,7 +20,7 @@
           "pathPart": "orders",
           "httpMethod": "POST",
           "integrationType": "HTTP",
-          "endpoint": "https://api.customerA.com/orders"
+          "endpoint": "https://dummyjson.com/products"
         }
       ]
     },
