@@ -3,7 +3,7 @@
     {
       "api_name": "helloUser",
       "stack_name": "CustomerAStack",
-      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev",
+      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser",
       "lambda_code_path": "src/helloUser",
       "html_endpoint": "",
       "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
@@ -14,7 +14,7 @@
           "pathPart": "users",
           "httpMethod": "GET",
           "integrationType": "AWS_PROXY",
-          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser:dev"
+          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser"
         },
         {
           "pathPart": "orders",
@@ -27,7 +27,7 @@
     {
       "api_name": "helloWorld",
       "stack_name": "CustomerBStack",
-      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld:dev",
+      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld",
       "lambda_code_path": "src/helloWorld",
       "html_endpoint": "",
       "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
@@ -38,14 +38,14 @@
           "pathPart": "items",
           "httpMethod": "GET",
           "integrationType": "AWS_PROXY",
-          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld:dev"
+          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld"
         }
       ]
     },
     {
       "api_name": "testNew",
       "stack_name": "NewFunc",
-      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:testNew:dev",
+      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:testNew",
       "lambda_code_path": "src/testNew",
       "html_endpoint": "",
       "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
@@ -56,7 +56,7 @@
           "pathPart": "items",
           "httpMethod": "GET",
           "integrationType": "AWS_PROXY",
-          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:testNew:dev"
+          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:testNew"
         }
       ]
     }
