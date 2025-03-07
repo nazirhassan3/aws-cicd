@@ -86,7 +86,7 @@ jobs:
               --memory-size 128
           else
             echo "Function exists. Updating..."
-            aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
+            aws lambda update-function-code --function-name ${FUNCTION_NAME} --s3-bucket naz-lambda --s3-key ${FUNCTION_NAME}.zip
           fi
 
       - name: Wait for Lambda Update to Complete
