@@ -76,7 +76,6 @@ Resources:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - CustomAuthorizer
-      - !If [CreateHtmlResource, HtmlMethod, !Ref "AWS::NoValue"]
     Properties:
       RestApiId: !Ref RestApi
 
