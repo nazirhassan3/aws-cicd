@@ -61,7 +61,7 @@ jobs:
           AWS_REGION=us-east-1
           ALIAS=dev
           API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ matrix.api_config.api_name }}'].id | [0]" --output text)
-          LAMBDA_ARN=$(echo "${{ matrix.api_config.lambda_function_arn }}" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
+          LAMBDA_ARN=$(echo "${{ matrix.api_config.lambda_function_arn }}")
           echo "Lambda ARN: $LAMBDA_ARN"
           SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
           # Try to get the current policy for the Lambda function
