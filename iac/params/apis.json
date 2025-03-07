@@ -18,7 +18,7 @@
         },
         {
           "pathPart": "orders",
-          "httpMethod": "POST",
+          "httpMethod": "GET",
           "integrationType": "HTTP",
           "endpoint": "https://dummyjson.com/products"
         }
