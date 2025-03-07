@@ -78,7 +78,7 @@ jobs:
           aws cloudformation deploy \
             --stack-name "${{ matrix.api_config.stack_name }}" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} \
+            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} StageName=dev \
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-east-1
 
@@ -133,7 +133,7 @@ jobs:
           aws cloudformation deploy \
             --stack-name "${{ matrix.api_config.stack_name }}" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} \
+            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} StageName=prod  \
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-east-1
 
