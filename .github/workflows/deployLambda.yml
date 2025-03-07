@@ -64,7 +64,7 @@ jobs:
           FUNCTION_NAME=${{ matrix.api_config.api_name }}
           BUCKET_NAME=naz-lambda
           ZIP_FILE="${FUNCTION_NAME}.zip"
-          cd src/${{ matrix.api_config.api_name }}
+          cd "${{ matrix.api_config.lambda_code_path }}"
           if [ -f "package.json" ]; then
             RUNTIME="nodejs18.x" #change to X
           else
