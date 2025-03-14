@@ -26,14 +26,18 @@ for res in data:
         integration = {
             "IntegrationHttpMethod": "POST",
             "Type": "AWS_PROXY",
-            "Uri": !Join
-                - ""
-                - - "arn:aws:apigateway:"
-                    - !Ref AWS::Region
-                    - ":lambda:path/2015-03-31/functions/"
-                    - !Ref LambdaFunctionArn
-                    - ":\${stageVariables.lambdaAlias}/invocations"
-            # "Uri": { "Fn::Sub": f"arn:aws:apigateway:${{AWS::Region}}:lambda:path/2015-03-31/functions/{res['lambdaFunctionArn']}/invocations" }
+            "Uri": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "arn:aws:apigateway:",
+                        "${AWS::Region}",  # This will be processed by CloudFormation
+                        ":lambda:path/2015-03-31/functions/",
+                        res["lambdaFunctionArn"],
+                        ":\\${stageVariables.lambdaAlias}/invocations"
+                    ]
+                ]
+            }
         }
     elif res["integrationType"] == "HTTP":
         integration = {
