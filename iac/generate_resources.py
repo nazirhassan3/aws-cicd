@@ -26,9 +26,7 @@ for res in data:
         integration = {
             "IntegrationHttpMethod": "POST",
             "Type": "AWS_PROXY",
-            "Uri":{ 
-  "Fn::Sub": f"arn:aws:apigateway:${{AWS::Region}}:lambda:path/2015-03-31/functions/{res['lambdaFunctionArn']}:$${{stageVariables.lambdaAlias}}/invocations"
-}
+            "Uri": { "Fn::Sub": f"arn:aws:apigateway:${{AWS::Region}}:lambda:path/2015-03-31/functions/{res['lambdaFunctionArn']}/invocations" }
         }
     elif res["integrationType"] == "HTTP":
         integration = {
