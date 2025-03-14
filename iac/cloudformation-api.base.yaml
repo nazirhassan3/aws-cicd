@@ -47,8 +47,6 @@ Resources:
       AuthorizerUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerLambdaArn}/invocations"
       AuthorizerResultTtlInSeconds: 300
 
-  # Removed the default /lambda resource and method
-
   HtmlResource:
     Type: AWS::ApiGateway::Resource
     Condition: CreateHtmlResource
