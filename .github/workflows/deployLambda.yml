@@ -193,7 +193,7 @@ jobs:
             --template-file iac/cloudformation-api.yaml \
             --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} StageName=${{ matrix.stage }} \
             --capabilities CAPABILITY_NAMED_IAM \
-            --region us-east-1
+            --region us-east-1 || ( echo "Failed to deploy stack. Fetching events:" && aws cloudformation describe-stack-events --stack-name "${{ matrix.api_config.stack_name }}-${{ matrix.stage }}" --region us-east-1 && exit 1 )
 
   deploy_api_prod:
     name: Deploy API (Prod)
