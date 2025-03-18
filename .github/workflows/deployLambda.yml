@@ -2,12 +2,13 @@ name: Deploy APIs with Multi-Stage
 
 on:
   push:
-    branches: nazir
+    branches: bilal
     paths:
       - "iac/params/apis.json"
       - "iac/cloudformation-api.base.yaml"
       - "iac/generate_resources.py"
       - "src/**"
+      - ".github/**"
   workflow_dispatch:
 
 jobs:
