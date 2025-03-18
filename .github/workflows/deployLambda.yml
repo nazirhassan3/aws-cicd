@@ -234,7 +234,6 @@ jobs:
   deploy_api_dev:
     name: Deploy CF Stacks (Dev)
     needs: [set-matrix, check_lambda_changes, update_lambda_dev]
-    if: needs.detect_changes.outputs.functions != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
