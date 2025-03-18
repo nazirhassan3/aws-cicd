@@ -68,13 +68,14 @@ jobs:
           echo "Previous Commit: ${{ github.event.before }}"
           echo "Current Commit: ${{ github.sha }}"
 
-  deploy_api_dev:
-    name: Deploy API (Dev)
-    needs: set-matrix
+  update_lambda_dev:
+    name: Update Lambda Functions (Dev)
+    needs: check_lambda_changes
+    if: needs.detect_changes.outputs.functions != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        api_config: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
+        api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -215,18 +216,51 @@ jobs:
       #       --capabilities CAPABILITY_NAMED_IAM \
       #       --region us-east-1
 
-      - name: Deploy CloudFormation Stacks (Dev)
-        if: needs.detect_changes.outputs.functions != '[]'
+      # - name: Deploy CloudFormation Stacks (Dev)
+      #   if: needs.detect_changes.outputs.functions != '[]'
+      #   run: |
+      #     TEMPLATES=$(echo '${{ toJson(matrix.api.cf_template) }}' | jq -r '.[]')
+      #     for template in $TEMPLATES; do
+      #       TEMPLATE_SUFFIX=$(basename "$template" .yaml)
+      #       STACK_NAME="${{ matrix.api.stack_name }}-${TEMPLATE_SUFFIX}-Dev"
+      #       echo "Deploying template $template to stack $STACK_NAME"
+      #       aws cloudformation deploy \
+      #         --stack-name "$STACK_NAME" \
+      #         --template-file "$template" \
+      #         --parameter-overrides AuthorizerLambdaArn=${{ matrix.api.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api.lambda_dev_alias }} \
+      #         --capabilities CAPABILITY_NAMED_IAM \
+      #         --region us-east-1
+      #     done
+  deploy_api_dev:
+    name: Deploy CF Stacks (Dev)
+    needs: [set-matrix, check_lambda_changes, update_lambda_dev]
+    if: needs.detect_changes.outputs.functions != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Deploy CF Templates (Dev)
         run: |
           TEMPLATES=$(echo '${{ toJson(matrix.api.cf_template) }}' | jq -r '.[]')
           for template in $TEMPLATES; do
-            TEMPLATE_SUFFIX=$(basename "$template" .yaml)
-            STACK_NAME="${{ matrix.api.stack_name }}-${TEMPLATE_SUFFIX}-Dev"
+            SUFFIX=$(basename "$template" .yaml)
+            STACK_NAME="${{ matrix.api.stack_name }}-${SUFFIX}-Dev"
             echo "Deploying template $template to stack $STACK_NAME"
             aws cloudformation deploy \
               --stack-name "$STACK_NAME" \
               --template-file "$template" \
-              --parameter-overrides AuthorizerLambdaArn=${{ matrix.api.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api.lambda_dev_alias }} \
+              --parameter-overrides ApiName=${{ matrix.api.api_name }} PrimaryLambdaFunctionArn=${{ matrix.api.primary_lambda_function_arn }} HtmlEndpoint=${{ matrix.api.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api.lambda_dev_alias }} \
               --capabilities CAPABILITY_NAMED_IAM \
               --region us-east-1
           done
