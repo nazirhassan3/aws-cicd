@@ -71,11 +71,11 @@ jobs:
   update_lambda_dev:
     name: Update Lambda Functions (Dev)
     needs: check_lambda_changes
-    if: needs.detect_changes.outputs.functions != '[]'
+    if: needs.check_lambda_changes.outputs.functions != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        function: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
+        function: ${{ fromJson(needs.check_lambda_changes.outputs.functions || '[]') }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -237,7 +237,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        function: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
+        function: ${{ fromJson(needs.check_lambda_changes.outputs.functions || '[]') }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
