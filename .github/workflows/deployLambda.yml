@@ -256,7 +256,7 @@ jobs:
           TEMPLATES=$(echo '${{ toJson(matrix.api.cf_template) }}' | jq -r '.[]')
           for template in $TEMPLATES; do
             SUFFIX=$(basename "$template" .yaml)
-            STACK_NAME="${{ matrix.api.stack_name }}-${SUFFIX}-Dev"
+            STACK_NAME="${{ matrix.api.stack_name }}-Dev"
             echo "Deploying template $template to stack $STACK_NAME"
             aws cloudformation deploy \
               --stack-name "$STACK_NAME" \
