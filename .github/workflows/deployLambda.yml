@@ -103,7 +103,22 @@ jobs:
         run: |
           FUNCTION_NAME=${{ matrix.api_config.api_name }}
           ALIAS_NAME="${{ matrix.stage }}"
-          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+          RETRIES=0
+          MAX_RETRIES=5
+          while [ $RETRIES -lt $MAX_RETRIES ]; do
+            RESULT=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text 2>&1)
+            if echo "$RESULT" | grep -q "ResourceConflictException"; then
+              echo "Update in progress for $FUNCTION_NAME. Retrying in 10 seconds..."
+              sleep 10
+              RETRIES=$((RETRIES+1))
+            else
+              VERSION=$RESULT
+              break
+            fi
+          done
+          if [ -z "$VERSION" ]; then
+            echo "Failed to publish version after multiple attempts." && exit 1
+          fi
           ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='${ALIAS_NAME}']" --output text)
           if [[ -z "$ALIAS_EXISTS" ]]; then
             echo "Alias '$ALIAS_NAME' does not exist. Creating it..."
