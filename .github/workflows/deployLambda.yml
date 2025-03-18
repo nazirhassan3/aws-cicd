@@ -8,6 +8,7 @@ on:
       - "iac/cloudformation-api.base.yaml"
       - "iac/generate_resources.py"
       - "src/**"
+      - ".github/**"
   workflow_dispatch:
 
 jobs:
