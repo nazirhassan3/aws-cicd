@@ -239,7 +239,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        api: ${{ fromJson(needs.check_lambda_changes.outputs.functions || '[]') }}
+        api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
