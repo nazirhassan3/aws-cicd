@@ -71,7 +71,7 @@ jobs:
 
   update_lambda_dev:
     name: Update Lambda Functions (Dev)
-    needs: check_lambda_changes
+    needs: [set-matrix, check_lambda_changes]
     if: needs.check_lambda_changes.outputs.functions != '[]'
     runs-on: ubuntu-latest
     strategy:
