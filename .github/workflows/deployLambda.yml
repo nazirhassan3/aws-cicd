@@ -2,13 +2,12 @@ name: Deploy APIs with Multi-Stage
 
 on:
   push:
-    branches: bilal
+    branches: nazir
     paths:
       - "iac/params/apis.json"
       - "iac/cloudformation-api.base.yaml"
       - "iac/generate_resources.py"
       - "src/**"
-      - ".github/**"
   workflow_dispatch:
 
 jobs:
@@ -69,7 +68,7 @@ jobs:
             RUNTIME="python3.13"
           fi
           HANDLER="lambda_function.lambda_handler"
-          ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
+          ROLE_ARN="arn:aws:iam::111111111111:role/basicLambdaRole"
           echo "Checking if Lambda function $FUNCTION_NAME exists..."
           FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
           if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
@@ -172,9 +171,9 @@ jobs:
 
       - name: Deploy CloudFormation Stack (Non-Prod)
         run: |
-          echo "Deploying API: ${{ matrix.api_config.api_name }} with stack: ${{ matrix.api_config.stack_name }} to stage: ${{ matrix.stage }}"
+          echo "Deploying API: ${{ matrix.api_config.api_name }} with stack: ${{ matrix.api_config.stack_name }}-${{ matrix.stage }} to stage: ${{ matrix.stage }}"
           aws cloudformation deploy \
-            --stack-name "${{ matrix.api_config.stack_name }}" \
+            --stack-name "${{ matrix.api_config.stack_name }}-${{ matrix.stage }}" \
             --template-file iac/cloudformation-api.yaml \
             --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} StageName=${{ matrix.stage }} \
             --capabilities CAPABILITY_NAMED_IAM \
