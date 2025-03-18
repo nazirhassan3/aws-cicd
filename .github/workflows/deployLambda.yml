@@ -23,6 +23,7 @@ jobs:
         id: set_matrix
         run: |
           MATRIX=$(jq -c '.apis' iac/params/apis.json)
+          echo "MATRIX: $MATRIX"
           echo "api_matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   check_lambda_changes:
