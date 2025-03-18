@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
+        function: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -237,7 +237,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
+        function: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
