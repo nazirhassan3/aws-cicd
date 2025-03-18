@@ -17,9 +17,6 @@ Parameters:
   LambdaDevAlias:
     Type: String
     Description: Lambda alias to use in the Dev stage.
-  LambdaProdAlias:
-    Type: String
-    Description: Lambda alias to use in the Prod stage.
 
 Resources:
   RestApi:
@@ -101,7 +98,7 @@ Resources:
       RestApiId: !Ref RestApi
       DeploymentId: !Ref ApiDeployment
       Variables:
-        lambdaAlias: !Ref LambdaProdAlias
+        lambdaAlias: "prod"
 
 Outputs:
   ApiUrlDev:
