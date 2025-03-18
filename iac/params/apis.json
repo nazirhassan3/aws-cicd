@@ -15,7 +15,7 @@
     },
     {
       "api_name": "helloWorld",
-      "stack_name": "helloUserStack",
+      "stack_name": "helloWorldStack",
       "cf_template": [
         "iac/helloUser-template.yaml",
         "iac/helloWorld-template.yaml"
