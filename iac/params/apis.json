@@ -2,45 +2,16 @@
   "apis": [
     {
       "api_name": "helloUser",
-      "stack_name": "CustomerAStack",
+      "stack_name": "helloUserStack",
+      "cf_template": [
+        "iac/helloUser-template.yaml",
+        "iac/helloWorld-template.yaml"
+      ],
       "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser",
       "lambda_code_path": "src/helloUser",
-      "html_endpoint": "",
       "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
       "lambda_dev_alias": "dev",
-      "lambda_prod_alias": "prod",
-      "resource_paths": [
-        {
-          "pathPart": "users",
-          "httpMethod": "GET",
-          "integrationType": "AWS_PROXY",
-          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser"
-        },
-        {
-          "pathPart": "orders",
-          "httpMethod": "GET",
-          "integrationType": "HTTP",
-          "endpoint": "https://dummyjson.com/products"
-        }
-      ]
-    },
-    {
-      "api_name": "helloWorld",
-      "stack_name": "CustomerBStack",
-      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld",
-      "lambda_code_path": "src/helloWorld",
-      "html_endpoint": "",
-      "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
-      "lambda_dev_alias": "dev",
-      "lambda_prod_alias": "prod",
-      "resource_paths": [
-        {
-          "pathPart": "items",
-          "httpMethod": "GET",
-          "integrationType": "AWS_PROXY",
-          "lambdaFunctionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld"
-        }
-      ]
+      "lambda_prod_alias": "prod"
     }
   ]
 }

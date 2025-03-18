@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  API Gateway REST API with multiple resource paths and two stages (Dev and Prod).
+  - /users: Integrated with a Lambda function (via AWS_PROXY).
+  - /orders: Integrated with an external HTTP endpoint.
+  - /html (optional): Integrated with an HTML endpoint.
+  Two stages are created, and the Lambda integration URI uses a stage variable to choose
+  the appropriate Lambda alias (Dev or Prod).
+
+Parameters:
+  ApiName:
+    Type: String
+    Description: The name of the API Gateway API.
+  AuthorizerLambdaArn:
+    Type: String
+    Description: ARN of the Lambda function for the custom authorizer (base ARN only).
+  LambdaDevAlias:
+    Type: String
+    Description: Lambda alias to use in the Dev stage.
+  LambdaProdAlias:
+    Type: String
+    Description: Lambda alias to use in the Prod stage.
+
+Resources:
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: "HelloUser"
+      Description: "API with multiple resource paths (users, orders, optional html) and two stages"
+
+  CustomAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: "CustomLambdaAuthorizer"
+      Type: TOKEN
+      RestApiId: !Ref RestApi
+      IdentitySource: method.request.header.Authorization
+      # Use Fn::Sub with a literal placeholder for stageVariables.lambdaAlias using Fn::Join
+      AuthorizerUri: !Join
+        - ""
+        - - "arn:aws:apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !Ref AuthorizerLambdaArn
+          - "/invocations"
+      AuthorizerResultTtlInSeconds: 300
+
+  # Resource: /users integrated with Lambda (using stage variable)
+  UsersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: users
+      RestApiId: !Ref RestApi
+
+  UsersMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref UsersResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref CustomAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Join
+          - ""
+          - - "arn:aws:apigateway:"
+            - !Ref "AWS::Region"
+            - ":lambda:path/2015-03-31/functions/"
+            - "arn:aws:lambda:us-east-1:443370673783:function:helloUser"
+            - ":"
+            - "$"
+            - "{stageVariables.lambdaAlias}"
+            - "/invocations"
+      MethodResponses:
+        - StatusCode: "200"
+
+  # Resource: /orders integrated with an external HTTP endpoint
+  ProductsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: products
+      RestApiId: !Ref RestApi
+
+  ProductsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ProductsResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: GET
+        Type: HTTP
+        Uri: "https://dummyjson.com/products"
+      MethodResponses:
+        - StatusCode: "200"
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - UsersMethod
+      - ProductsMethod
+      - CustomAuthorizer
+    Properties:
+      RestApiId: !Ref RestApi
+
+  DevStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: dev
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      Variables:
+        lambdaAlias: !Ref LambdaDevAlias
+
+  ProdStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: prod
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      Variables:
+        lambdaAlias: !Ref LambdaProdAlias
+
+Outputs:
+  ApiUrlDev:
+    Description: "Dev API URL"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/dev"
+  ApiUrlProd:
+    Description: "Prod API URL"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
