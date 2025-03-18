@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        function: ${{ fromJson(needs.check_lambda_changes.outputs.functions || '[]') }}
+        api: ${{ fromJson(needs.check_lambda_changes.outputs.functions || '[]') }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -234,10 +234,11 @@ jobs:
   deploy_api_dev:
     name: Deploy CF Stacks (Dev)
     needs: [set-matrix, check_lambda_changes, update_lambda_dev]
+    if: needs.check_lambda_changes.outputs.functions != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        function: ${{ fromJson(needs.check_lambda_changes.outputs.functions || '[]') }}
+        api: ${{ fromJson(needs.check_lambda_changes.outputs.functions || '[]') }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
