@@ -40,7 +40,7 @@ jobs:
       - name: Check for Lambda Code Changes
         id: check
         run: |
-          # Use github.event.before as the previous commit, with fallback if invalid.
+          # Determine a valid previous commit.
           PREVIOUS_COMMIT="${{ github.event.before }}"
           if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
             PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
@@ -48,34 +48,30 @@ jobs:
 
           echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
 
-          if [ -z "$PREVIOUS_COMMIT" ]; then
-            CHANGED_FILES=$(git ls-files | grep '^lambda-functions/.*' || true)
-          else
-            CHANGED_FILES=$(git diff --name-only "$PREVIOUS_COMMIT" "${{ github.sha }}" || true)
-          fi
-
-          echo "Changed files: $CHANGED_FILES"
-
           updated_list=""
-          # Loop over each lambda defined in your configuration file (assuming it is named lambda-config.json)
+
+          # Loop over each lambda configuration from lambda-config.json.
           for lambda in $(jq -c '.lambdas[]' src/lambda-config.json); do
             NAME=$(echo "$lambda" | jq -r '.name')
             CODE_PATH=$(echo "$lambda" | jq -r '.codePath')
-            # Skip if CODE_PATH is empty or null.
+            
+            # If CODE_PATH is "null" or empty, skip this lambda.
             if [ "$CODE_PATH" = "null" ] || [ -z "$CODE_PATH" ]; then
-              echo "No codePath for $NAME; skipping..."
+              echo "No codePath provided for $NAME; skipping..."
               continue
             fi
 
             echo "Checking changes for $NAME in $CODE_PATH..."
-            if echo "$CHANGED_FILES" | grep -q "^$CODE_PATH"; then
+            
+            # Use git diff to detect changes in the specified directory.
+            if git diff --name-only "$PREVIOUS_COMMIT" "${{ github.sha }}" | grep -q "^$CODE_PATH"; then
               echo "Changes detected in $NAME"
               updated_list="${updated_list},$NAME"
             fi
           done
 
-          # Remove leading comma, if any
-          updated_list=$(echo "$updated_list" | sed 's/^,//' | xargs)
+          # Remove any leading comma
+          updated_list=$(echo "$updated_list" | sed 's/^,//')
           echo "Updated Lambdas: $updated_list"
           echo "::set-output name=updated::$updated_list"
 
