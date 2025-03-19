@@ -75,6 +75,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          echo "Function : ${{ matrix.function }}"
           cd src/${{ matrix.function }}
           if [ -f "package.json" ]; then npm install; fi
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt -t .; fi
