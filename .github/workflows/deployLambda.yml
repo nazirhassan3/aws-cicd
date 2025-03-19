@@ -73,7 +73,7 @@ jobs:
           # Remove any leading comma
           updated_list=$(echo "$updated_list" | sed 's/^,//')
           echo "Updated Lambdas: $updated_list"
-          echo "::set-output name=updated::$updated_list"
+          echo "updated=$updated_list" >> "$GITHUB_OUTPUT"
 
       - name: Debug Changed Functions
         run: echo "Changed functions ${{ needs.check_lambda_changes.outputs.updated }}"
