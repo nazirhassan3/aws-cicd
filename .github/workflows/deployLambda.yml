@@ -22,10 +22,12 @@ jobs:
         id: read
         run: |
           CONFIG=$(cat src/lambda-config.json)
-          echo "lambda_config=$(echo "$CONFIG" | jq -c .)" >> $GITHUB_OUTPUT
+          echo "lambda_config<<EOF" >> $GITHUB_OUTPUT
+          echo "$CONFIG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Debug Lambda Config
-        run: echo "Lambda config ${{ steps.set-config.outputs.lambda_config }}"
+        run: echo "Lambda config ${{ steps.read.outputs.lambda_config }}"
 
   # Check for changes in each lambda code directory
   check_lambda_changes:
