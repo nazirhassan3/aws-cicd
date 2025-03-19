@@ -53,7 +53,7 @@ jobs:
 
           # Split the cleaned string by comma into an array
           IFS=',' read -ra TEMPLATE_ARRAY <<< "$cleaned"
-
+          echo "Deploying template: $TEMPLATE_ARRAY"
           # Iterate over each template file path
           for file in "${TEMPLATE_ARRAY[@]}"; do
             # Trim any extra whitespace
@@ -71,5 +71,5 @@ jobs:
           done
 
       - name: No CF Templates Changed
-        if: steps.cffiles.outputs.files == ''
+        if: steps.detect.outputs.TEMPLATES == ''
         run: echo "No CloudFormation template changes detected. Skipping deployment."
