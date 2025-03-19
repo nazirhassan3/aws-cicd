@@ -21,12 +21,8 @@ jobs:
       - name: Read Lambda Configurations
         id: read
         run: |
-          CONFIG=$(cat src/lambda-config.json)
-          echo "Configuration file content:"
-          echo "$CONFIG"
-          echo "lambda_config<<EOF" >> $GITHUB_OUTPUT
-          echo "$CONFIG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          CONFIG=$(cat lambda-config.json)
+          echo "lambda_config=$(echo "$CONFIG" | jq -c .)" >> $GITHUB_OUTPUT
 
       - name: Debug Lambda Config
         run: echo "Lambda config ${{ steps.set-config.outputs.lambda_config }}"
