@@ -34,7 +34,7 @@ jobs:
             CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/lambda-functions/' || true)
           fi
 
-          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) | map(.) // []')
+          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | cut -d '/' -f 3 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) | map(.) // []')
 
             # Ensure proper JSON output
             if [ -z "$CHANGED_FUNCTIONS" ] || [ "$CHANGED_FUNCTIONS" = "null" ]; then
