@@ -36,13 +36,12 @@ jobs:
           CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | xargs -n 1 basename | sort -u | jq -R -s -c 'split("\n")[:-1]')
 
           echo "Detected changed TEMPLATES: $CHANGED_TEMPLATES"
-          echo "::set-output name=files::$CHANGED_TEMPLATES"
-          # echo "TEMPLATES=$CHANGED_TEMPLATES" >> "$GITHUB_OUTPUT"
+          echo "TEMPLATES=$CHANGED_TEMPLATES" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Changed CF Templates
-        if: steps.detect.outputs.files != ''
+        if: steps.detect.outputs.TEMPLATES != ''
         run: |
-          files="${{ steps.cffiles.outputs.files }}"
+          files="${{ steps.cffiles.outputs.TEMPLATES }}"
           echo "Deploying the following CloudFormation templates:"
           echo "$files"
           for file in $files; do
