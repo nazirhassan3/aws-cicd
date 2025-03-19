@@ -29,15 +29,11 @@ jobs:
           if [ -z "$PREVIOUS_COMMIT" ]; then
             CHANGED_FILES=$(git ls-files | grep '^src/cloudFormationTemplates/.*\.yaml$' || true)
           else
-            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/cloudFormationTemplates/.*\.yaml$' || true)
+            CHANGED_FILES=$(git diff --name-only "$PREVIOUS_COMMIT" "${{ github.sha }}" | grep '^src/cloudFormationTemplates/.*\.yaml$' || true)
           fi
 
-          CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) | map(.) // []')
-
-            # Ensure proper JSON output
-            if [ -z "$CHANGED_TEMPLATES" ] || [ "$CHANGED_TEMPLATES" = "null" ]; then
-              CHANGED_TEMPLATES="[]"
-            fi
+          # Use basename to extract just the file name, sort them, and output as JSON.
+          CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | xargs -n 1 basename | sort -u | jq -R -s -c 'split("\n")[:-1]')
 
           echo "Detected changed TEMPLATES: $CHANGED_TEMPLATES"
           echo "::set-output name=files::$CHANGED_TEMPLATES"
