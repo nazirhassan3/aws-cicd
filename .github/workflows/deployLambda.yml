@@ -20,7 +20,7 @@ jobs:
         id: read
         run: |
           # Read the lambda configuration file and output it as JSON.
-          CONFIG=$(cat src/lambda-config.json)
+          CONFIG=$(cat lambda-config.json)
           echo "lambda_matrix=$CONFIG" >> $GITHUB_OUTPUT
 
   check_lambda_changes:
