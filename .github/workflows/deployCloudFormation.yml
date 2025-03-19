@@ -1,4 +1,4 @@
-name: Deploy APIs with Multi-Stage
+name: Deploy Cloud Formation Templates
 
 on:
   push:
