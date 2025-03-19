@@ -37,7 +37,7 @@ jobs:
           # Initialize an empty list for changed function names
           CHANGED=""
           # Loop over each lambda configuration from the file
-          LAMBDAS=$(jq -c '.lambdas[]' lambda-config.json)
+          LAMBDAS=$(jq -c '.lambdas[]' src/lambda-config.json)
           for lambda in $LAMBDAS; do
             # Extract function name and code path
             FUNCTION_NAME=$(echo $lambda | jq -r '.functionName')
@@ -73,7 +73,7 @@ jobs:
           CHANGED_FUNCTIONS="${{ needs.check_lambda_changes.outputs.changed_functions }}"
           echo "Changed Lambda functions: $CHANGED_FUNCTIONS"
           # Read lambda configurations from the file
-          LAMBDAS=$(jq -c '.lambdas[]' lambda-config.json)
+          LAMBDAS=$(jq -c '.lambdas[]' src/lambda-config.json)
           for lambda in $LAMBDAS; do
             FUNCTION_NAME=$(echo $lambda | jq -r '.functionName')
             CODE_PATH=$(echo $lambda | jq -r '.codePath')
