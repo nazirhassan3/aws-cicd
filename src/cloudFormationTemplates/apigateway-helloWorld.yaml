@@ -42,7 +42,7 @@ Resources:
           - "/invocations"
       AuthorizerResultTtlInSeconds: 300
 
-  # Resource: /users integrated with Lambda (using stage variable)
+  # Resource: /users integrated with Lambda (using stage variable) Test
   WorldResource:
     Type: AWS::ApiGateway::Resource
     Properties:
