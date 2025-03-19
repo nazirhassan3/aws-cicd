@@ -1,4 +1,4 @@
-name: Deploy Changed Lambda Functions
+name: Deploy Updated Lambda Functions
 
 on:
   push:
@@ -8,93 +8,253 @@ on:
       - "src/lambda-functions/**"
 
 jobs:
-  # Job to detect changes and dynamically build a matrix of changed lambda functions.
-  detect-changed:
+  detect_changes:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      functions: ${{ steps.detect.outputs.FUNCTIONS }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Detect changed lambda functions
-        id: set-matrix
-        run: |
-          echo "Detecting changed lambda functions..."
-          # Get changed files between the previous and current commits
-          CHANGED=$(git diff --name-only "${{ github.event.before }}" "${{ github.event.after }}")
-          echo "Changed files:"
-          echo "$CHANGED"
-          # Filter for files in the lambda-functions directory and extract the top-level folder names
-          CHANGED_LAMBDAS=$(echo "$CHANGED" | grep '^src/lambda-functions/' | cut -d'/' -f3 | sort | uniq)
-          echo "Changed lambda function directories:"
-          echo "$CHANGED_LAMBDAS"
-          if [ -z "$CHANGED_LAMBDAS" ]; then
-            echo "No changes detected in lambda functions."
-            echo "::set-output name=matrix::{}"
-          else
-            # Build a JSON matrix in the form: { "include": [ { "function_dir": "func1" }, { "function_dir": "func2" } ] }
-            MATRIX_JSON=$(echo "$CHANGED_LAMBDAS" | jq -R -s -c 'split("\n") | map(select(. != "")) | map({function_dir: .}) | {include: .}')
-            echo "Matrix JSON: $MATRIX_JSON"
-            echo "::set-output name=matrix::$MATRIX_JSON"
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Job to deploy the changed lambda functions (e.g. to a staging or test environment)
-  deploy:
-    needs: detect-changed
-    runs-on: ubuntu-latest
-    # Only run if there is a non-empty matrix
-    if: ${{ fromJson(needs.detect-changed.outputs.matrix) != null }}
-    strategy:
-      matrix: ${{ fromJson(needs.detect-changed.outputs.matrix) }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Checkout Code
+        uses: actions/checkout@v2
         with:
+          fetch-depth: 0
+
+      - name: Detect Changed Lambda Functions
+        id: detect
+        run: |
+          PREVIOUS_COMMIT=${{ github.event.before }}
+          if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
+            PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
+          fi
+
+          echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
+
+          if [ -z "$PREVIOUS_COMMIT" ]; then
+            CHANGED_FILES=$(git ls-files | grep '^src/lambda-functions/' || true)
+          else
+            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/lambda-functions/' || true)
+          fi
+
+          CHANGED_FUNCTIONS=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) | map(.) // []')
+
+            # Ensure proper JSON output
+            if [ -z "$CHANGED_FUNCTIONS" ] || [ "$CHANGED_FUNCTIONS" = "null" ]; then
+              CHANGED_FUNCTIONS="[]"
+            fi
+
+          echo "Detected changed Lambda functions: $CHANGED_FUNCTIONS"
+          echo "FUNCTIONS=$CHANGED_FUNCTIONS" >> "$GITHUB_OUTPUT"
+
+      - name: Debug Git History
+        run: |
+          git log --oneline -n 5
+          echo "Previous Commit: ${{ github.event.before }}"
+          echo "Current Commit: ${{ github.sha }}"
+
+      - name: Debug JSON Output
+        run: |
+          echo "Raw JSON Output: '${{ steps.detect.outputs.functions }}'"
+
+  deploy:
+    needs: detect_changes
+    if: needs.detect_changes.outputs.functions != '[]'
+    strategy:
+      matrix:
+        function: ${{ fromJson(needs.detect_changes.outputs.functions || '[]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
 
-      - name: Deploy Lambda Function - ${{ matrix.function_dir }}
-        working-directory: src/lambda-functions/${{ matrix.function_dir }}
+      - name: Install Dependencies
         run: |
-          echo "Deploying function: ${{ matrix.function_dir }}..."
-          # (Optional) Read and use configuration from a per-function config file here, e.g., config.json
-          # Package the function code
-          zip -r function.zip .
-          # Update the Lambda function code. Adjust the function name as needed.
-          aws lambda update-function-code --function-name my-${{ matrix.function_dir }} --zip-file fileb://function.zip
+          cd src/lambda-functions/${{ matrix.function }}
+          if [ -f "package.json" ]; then npm install; fi
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt -t .; fi
 
-  # Job to deploy to production; note that this job uses an environment (named "production")
-  # which should be configured in your repository settings to require manual approval.
-  deploy-prod:
-    name: Deploy to Production (Manual Approval Required)
-    needs: detect-changed
-    runs-on: ubuntu-latest
-    if: ${{ fromJson(needs.detect-changed.outputs.matrix) != null }}
-    environment:
-      name: production
-    strategy:
-      matrix: ${{ fromJson(needs.detect-changed.outputs.matrix) }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Package Lambda Function
+        run: |
+          cd src/lambda-functions/${{ matrix.function }}
+          zip -r ../../${{ matrix.function }}.zip .
 
-      - name: Set up AWS credentials for Prod
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Upload to S3
+        run: |
+          aws s3 cp ${{ matrix.function }}.zip s3://naz-lambda/
+
+      - name: Deploy Lambda Function (Create or Update)
+        run: |
+          FUNCTION_NAME=${{ matrix.function }}
+          BUCKET_NAME=naz-lambda
+          ZIP_FILE="${FUNCTION_NAME}.zip"
+          cd src/lambda-functions/${{ matrix.function }}
+          if [ -f "package.json" ]; then
+            RUNTIME="nodejs18.x" #change to X
+          else
+            RUNTIME="python3.13"
+          fi
+          HANDLER="lambda_function.lambda_handler"  
+          ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
+          echo "Checking if Lambda function $FUNCTION_NAME exists..."
+          FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
+          if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
+            echo "Function does not exist. Creating..."
+            aws lambda create-function \
+              --function-name $FUNCTION_NAME \
+              --runtime $RUNTIME \
+              --role $ROLE_ARN \
+              --handler $HANDLER \
+              --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
+              --timeout 10 \
+              --memory-size 128
+          else
+            echo "Function exists. Updating..."
+            aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
+          fi
+
+      - name: Wait for Lambda Update to Complete
+        run: |
+          FUNCTION_NAME=${{ matrix.function }}
+          echo "Waiting for Lambda function $FUNCTION_NAME to be in Active state..."
+          STATUS=""
+          while [[ "$STATUS" != "Active" ]]; do
+            sleep 5
+            STATUS=$(aws lambda get-function-configuration --function-name $FUNCTION_NAME --query "State" --output text)
+            echo "Current Status: $STATUS"
+          done
+          echo "Lambda function is now Active."
+
+      - name: Ensure Alias Exists and Update
+        run: |
+          FUNCTION_NAME=${{ matrix.function }}
+          ALIAS_NAME="dev"
+          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+
+          ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
+
+          if [[ -z "$ALIAS_EXISTS" ]]; then
+            echo "Alias '$ALIAS_NAME' does not exist. Creating it..."
+            aws lambda create-alias \
+              --function-name $FUNCTION_NAME \
+              --name $ALIAS_NAME \
+              --function-version $VERSION
+          else
+            echo "Alias '$ALIAS_NAME' exists. Updating it..."
+            aws lambda update-alias \
+              --function-name $FUNCTION_NAME \
+              --name $ALIAS_NAME \
+              --function-version $VERSION
+          fi
+
+          echo "Alias '$ALIAS_NAME' now points to version $VERSION"
+
+      # - name: Configure AWS Credentials
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-region: us-west-1
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # - name: Copy S3 Object to Target Region
+      #   run: |
+      #     SOURCE_BUCKET=naz-lambda
+      #     DEST_BUCKET=naz-lambda-west
+      #     FUNCTION_NAME=${{ matrix.function }}
+      #     ZIP_FILE="${FUNCTION_NAME}.zip"
+      #     LAMBDA_REGION="us-west-1"
+      #     SOURCE_REGION="us-east-1"
+
+      #     echo "Copying $ZIP_FILE from $SOURCE_BUCKET ($SOURCE_REGION) to $DEST_BUCKET ($LAMBDA_REGION)..."
+
+      #     aws s3 cp s3://$SOURCE_BUCKET/$ZIP_FILE s3://$DEST_BUCKET/$ZIP_FILE --source-region $SOURCE_REGION --region $LAMBDA_REGION
+
+      # - name: Deploy Lambda Function
+      #   run: |
+      #     FUNCTION_NAME=${{ matrix.function }}
+      #     BUCKET_NAME=naz-lambda-west
+      #     ZIP_FILE="${FUNCTION_NAME}.zip"
+      #     cd src/${{ matrix.function }}
+      #     if [ -f "package.json" ]; then
+      #       RUNTIME="nodejs18.x"
+      #     else
+      #       RUNTIME="python3.13"
+      #     fi
+      #     HANDLER="lambda_handler"  # Change based on your function's entry point
+      #     ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
+      #     echo "Checking if Lambda function $FUNCTION_NAME exists..."
+      #     FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
+      #     if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
+      #       echo "Function does not exist. Creating..."
+      #       aws lambda create-function \
+      #         --function-name $FUNCTION_NAME \
+      #         --runtime $RUNTIME \
+      #         --role $ROLE_ARN \
+      #         --handler $HANDLER \
+      #         --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
+      #         --timeout 10 \
+      #         --memory-size 128
+      #     else
+      #       echo "Function exists. Updating..."
+      #       aws lambda update-function-code --function-name ${{ matrix.function }} --s3-bucket naz-lambda --s3-key ${{ matrix.function }}.zip
+      #     fi
+
+      #      echo "Publishing new version..."
+      #     VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+      #     echo "Latest Version: $VERSION"
+
+      #     echo "Updating dev alias to version $VERSION..."
+      #     aws lambda update-alias \
+      #       --function-name $FUNCTION_NAME \
+      #       --name dev \
+      #       --function-version $VERSION
+
+      - name: Check and Add Lambda Permission
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          FUNCTION_NAME="${{ matrix.function }}"
+          AWS_REGION=us-east-1
+          ALIAS=dev
+          API_ID=$(aws apigateway get-rest-apis --query "items[?name=='$API_NAME'].id | [0]" --output text)
+          LAMBDA_ARN="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:${FUNCTION_NAME}:${ALIAS}"
+          echo "Lambda ARN: $LAMBDA_ARN"
+          SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
+          # Try to get the current policy for the Lambda function
+          POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)
+          STATEMENT_ID=${{ matrix.function }}-dev  
+          if [ -z "$POLICY" ]; then
+            echo "No existing policy found. Adding permission..."
+            aws lambda add-permission \
+              --function-name "$LAMBDA_ARN" \
+              --statement-id "$STATEMENT_ID" \
+              --action lambda:InvokeFunction \
+              --principal apigateway.amazonaws.com \
+              --source-arn "$SOURCE_ARN" \
+              --region "$AWS_REGION"
+          else
+            # Extract the policy document and check for the statement ID
+            EXISTS=$(echo "$POLICY" | jq -r --arg sid "$STATEMENT_ID" '.Policy | fromjson | .Statement[] | select(.Sid==$sid) | .Sid' 2>/dev/null)
+            if [ "$EXISTS" == "$STATEMENT_ID" ]; then
+              echo "Permission with StatementId '$STATEMENT_ID' already exists for $LAMBDA_ARN."
+            else
+              echo "Permission with StatementId '$STATEMENT_ID' does not exist. Adding permission..."
+              aws lambda add-permission \
+                --function-name "$LAMBDA_ARN" \
+                --statement-id "$STATEMENT_ID" \
+                --action lambda:InvokeFunction \
+                --principal apigateway.amazonaws.com \
+                --source-arn "$SOURCE_ARN" \
+                --region "$AWS_REGION"
+            fi
+          fi
+
+      - name: Trigger API Gateway Deployment Approval
+        uses: benc-uk/workflow-dispatch@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_PROD_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_PROD_AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Deploy Lambda Function to Production - ${{ matrix.function_dir }}
-        working-directory: src/lambda-functions/${{ matrix.function_dir }}
-        run: |
-          echo "Deploying function: ${{ matrix.function_dir }} to production..."
-          zip -r function.zip .
-          aws lambda update-function-code --function-name prod-${{ matrix.function_dir }} --zip-file fileb://function.zip
+          workflow: "approve-and-deploy.yml"
+          token: ${{ secrets.PAT_TOKEN }}
+          inputs: '{"function": "${{ matrix.function }}"}'
