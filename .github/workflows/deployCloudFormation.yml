@@ -48,15 +48,21 @@ jobs:
       - name: Deploy Changed CF Templates
         if: steps.detect.outputs.TEMPLATES != ''
         run: |
-          # Extract each file path from the JSON array.
-          echo "Raw TEMPLATES: ${{ steps.detect.outputs.TEMPLATES }}"
-          FILES=$(echo "${{ steps.detect.outputs.TEMPLATES }}" | jq -r '.[]')
-          echo "Deploying the following CloudFormation templates:"
-          echo "$FILES"
-          for file in $FILES; do
-            # Use the full relative path as provided.
+          cleaned=$(echo "$raw_templates" | sed 's/^\[//; s/\]$//')
+          echo "Cleaned string: ${{ steps.detect.outputs.TEMPLATES }}"
+
+          # Split the cleaned string by comma into an array
+          IFS=',' read -ra TEMPLATE_ARRAY <<< "$cleaned"
+
+          # Iterate over each template file path
+          for file in "${TEMPLATE_ARRAY[@]}"; do
+            # Trim any extra whitespace
+            file=$(echo "$file" | xargs)
+            echo "Deploying template: $file"
+            # Construct a stack name based on the file's basename (without .yaml extension)
             stackName=$(basename "$file" .yaml)
-            echo "Deploying template: $file to stack: $stackName"
+            echo "Using stack name: $stackName"
+            # Deploy the CloudFormation stack
             aws cloudformation deploy \
               --stack-name "$stackName" \
               --template-file "$file" \
