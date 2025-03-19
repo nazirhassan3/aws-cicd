@@ -48,7 +48,7 @@ jobs:
       - name: Deploy Changed CF Templates
         if: steps.detect.outputs.TEMPLATES != ''
         run: |
-          cleaned=$(echo "$raw_templates" | sed 's/^\[//; s/\]$//')
+          cleaned=$(echo "${{ steps.detect.outputs.TEMPLATES }}" | sed 's/^\[//; s/\]$//')
           echo "Cleaned string: ${{ steps.detect.outputs.TEMPLATES }}"
           echo "cleaned: $cleaned"
           # Split the cleaned string by comma into an array
