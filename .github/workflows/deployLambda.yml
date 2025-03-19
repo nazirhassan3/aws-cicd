@@ -35,43 +35,48 @@ jobs:
       updated: ${{ steps.collect.outputs.updated }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
-      - name: Determine Updated Lambda Functions
-        id: collect
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Check for Lambda Code Changes
+        id: check
         run: |
-          # Determine a valid previous commit.
+          # Use github.event.before as the previous commit, with fallback if invalid.
           PREVIOUS_COMMIT="${{ github.event.before }}"
           if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
-            echo "No valid previous commit provided; defaulting to HEAD~1"
-            PREVIOUS_COMMIT=$(git rev-parse HEAD~1 || echo "")
+            PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
           fi
 
           echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
 
-          updated_list=""
+          if [ -z "$PREVIOUS_COMMIT" ]; then
+            CHANGED_FILES=$(git ls-files | grep '^lambda-functions/.*' || true)
+          else
+            CHANGED_FILES=$(git diff --name-only "$PREVIOUS_COMMIT" "${{ github.sha }}" || true)
+          fi
 
-          # Loop over each lambda configuration from lambda-config.json.
-          for lambda in $(jq -c '.lambdas[]' src/lambda-config.json); do
+          echo "Changed files: $CHANGED_FILES"
+
+          updated_list=""
+          # Loop over each lambda defined in your configuration file (assuming it is named lambda-config.json)
+          for lambda in $(jq -c '.lambdas[]' lambda-config.json); do
             NAME=$(echo "$lambda" | jq -r '.name')
             CODE_PATH=$(echo "$lambda" | jq -r '.codePath')
-            
-            # If CODE_PATH is "null" or empty, skip this lambda.
+            # Skip if CODE_PATH is empty or null.
             if [ "$CODE_PATH" = "null" ] || [ -z "$CODE_PATH" ]; then
-              echo "No codePath provided for $NAME; skipping..."
+              echo "No codePath for $NAME; skipping..."
               continue
             fi
 
             echo "Checking changes for $NAME in $CODE_PATH..."
-            
-            # Use git diff to detect changes in the specified directory.
-            if git diff --name-only "$PREVIOUS_COMMIT" "${{ github.sha }}" | grep -q "^$CODE_PATH"; then
+            if echo "$CHANGED_FILES" | grep -q "^$CODE_PATH"; then
               echo "Changes detected in $NAME"
               updated_list="${updated_list},$NAME"
             fi
           done
 
-          # Remove any leading comma
-          updated_list=$(echo "$updated_list" | sed 's/^,//')
+          # Remove leading comma, if any
+          updated_list=$(echo "$updated_list" | sed 's/^,//' | xargs)
           echo "Updated Lambdas: $updated_list"
           echo "::set-output name=updated::$updated_list"
 
