@@ -27,7 +27,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Debug Lambda Config
-        run: echo "Lambda config ${{ steps.read.outputs.lambda_config }}"
+        run: echo "Lambda config ${{ fromJson(steps.read.outputs.lambda_config) }}"
 
   # Check for changes in each lambda code directory
   check_lambda_changes:
@@ -129,7 +129,7 @@ jobs:
   # Update Lambdas for Prod deployment (publish version & update alias)
   update_lambda_prod:
     name: Update Lambda Functions (Prod)
-    needs: [check_lambda_changes, set-config]
+    needs: check_lambda_changes
     if: ${{ needs.check_lambda_changes.outputs.updated != '' }}
     runs-on: ubuntu-latest
     strategy:
