@@ -3,7 +3,7 @@ name: Deploy Changed Lambda Functions
 on:
   push:
     branches:
-      - main
+      - nazir
     paths:
       - "src/lambda-functions/**"
 
