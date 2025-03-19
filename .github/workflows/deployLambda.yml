@@ -46,7 +46,7 @@ jobs:
     needs: detect-changed
     runs-on: ubuntu-latest
     # Only run if there is a non-empty matrix
-    if: ${{ fromJson(needs.detect-changed.outputs.matrix) != {} }}
+    if: ${{ fromJson(needs.detect-changed.outputs.matrix) != null }}
     strategy:
       matrix: ${{ fromJson(needs.detect-changed.outputs.matrix) }}
     steps:
