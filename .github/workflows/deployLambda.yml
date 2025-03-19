@@ -1,4 +1,4 @@
-name: Deploy APIs if Relevant Lambda Updated
+name: Deploy Lambda Functions if Code Updated
 
 on:
   push:
@@ -9,57 +9,62 @@ on:
   workflow_dispatch:
 
 jobs:
-  set-matrix:
-    name: Set Matrix from API Configurations
+  # Read configuration from lambda-config.json into a matrix
+  set-config:
+    name: Set Lambda Configuration
     runs-on: ubuntu-latest
     outputs:
-      api_matrix: ${{ steps.set_matrix.outputs.api_matrix }}
+      lambda_config: ${{ steps.read.outputs.lambda_config }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-      - name: Read API Configurations
-        id: set_matrix
+      - name: Read Lambda Configurations
+        id: read
         run: |
-          MATRIX=$(jq -c '.apis' src/lambda-config.json)
-          echo "api_matrix<<EOF" >> $GITHUB_OUTPUT
-          echo "$MATRIX" >> $GITHUB_OUTPUT
+          CONFIG=$(cat src/lambda-config.json)
+          echo "lambda_config<<EOF" >> $GITHUB_OUTPUT
+          echo "$CONFIG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+  # Check for changes in each lambda code directory
   check_lambda_changes:
-    name: Check for Lambda Code Changes
+    name: Detect Lambda Code Changes
+    needs: set-config
     runs-on: ubuntu-latest
     outputs:
-      changed_functions: ${{ steps.check.outputs.changed_functions }}
+      updated: ${{ steps.collect.outputs.updated }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-      - name: Check for changes in lambda-functions directories
-        id: check
+      - name: Determine Updated Lambda Functions
+        id: collect
         run: |
-          changed_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
-          echo "Changed files: $changed_files"
-          CHANGED=""
-          # Check primary lambda code directory
-          if echo "$changed_files" | grep -q '^lambda-functions/CustomerA/main'; then
-            CHANGED="${CHANGED}main,"
-          fi
-          # Check addUser (or secondary) lambda code directory
-          if echo "$changed_files" | grep -q '^lambda-functions/CustomerA/addUser'; then
-            CHANGED="${CHANGED}addUser,"
-          fi
-          # Remove trailing comma
-          CHANGED=$(echo "$CHANGED" | sed 's/,$//')
-          echo "Changed Lambda functions: $CHANGED"
-          echo "::set-output name=changed_functions::$CHANGED"
+          updated_list=""
+          # Loop over each lambda defined in the configuration
+          for lambda in $(jq -c '.lambdas[]' src/lambda-config.json); do
+            NAME=$(echo $lambda | jq -r '.name')
+            CODE_PATH=$(echo $lambda | jq -r '.codePath')
+            echo "Checking changes for $NAME in $CODE_PATH..."
+            # Use git diff to see if there were any changes in the lambda code directory
+            if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -q "^$CODE_PATH"; then
+              echo "Changes detected in $NAME"
+              updated_list="$updated_list,$NAME"
+            fi
+          done
+          # Remove leading comma if present
+          updated_list=$(echo "$updated_list" | sed 's/^,//')
+          echo "Updated Lambdas: $updated_list"
+          echo "::set-output name=updated::$updated_list"
 
+  # Update Lambdas for Dev deployment (update $LATEST code)
   update_lambda_dev:
     name: Update Lambda Functions (Dev)
     needs: check_lambda_changes
-    if: ${{ needs.check_lambda_changes.outputs.changed_functions != '' }}
+    if: ${{ needs.check_lambda_changes.outputs.updated != '' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
+        lambda: ${{ fromJson(needs.set-config.outputs.lambda_config) }} # Pass the whole config
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -68,29 +73,41 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-region: us-east-1
-          aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
-          aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Update primary lambda function for Dev
-      - name: Update Primary Lambda Code (Dev)
-        if: ${{ contains(needs.check_lambda_changes.outputs.changed_functions, 'main') && matrix.api.codePath != '' }}
+      - name: Update Lambda Functions (Dev)
         run: |
-          echo "Updating primary Lambda for API: ${{ matrix.api.functionName }} (main)"
-          cd "${{ matrix.api.codePath }}"
-          zip -r function.zip .
-          BASE_ARN=$(echo "${{ matrix.api.functionArn }}" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
-          echo "Updating Lambda function code for $BASE_ARN"
-          aws lambda update-function-code --function-name "$BASE_ARN" --zip-file fileb://function.zip --region us-east-1
-          cd -
+          UPDATED="${{ needs.check_lambda_changes.outputs.updated }}"
+          echo "Updated functions: $UPDATED"
+          # Process each lambda configuration in the file.
+          for lambda in $(jq -c '.lambdas[]' lambda-config.json); do
+            NAME=$(echo $lambda | jq -r '.name')
+            CODE_PATH=$(echo $lambda | jq -r '.codePath')
+            FUNCTION_ARN=$(echo $lambda | jq -r '.functionArn')
+            DEV_ALIAS=$(echo $lambda | jq -r '.devAlias')
+            if echo "$UPDATED" | grep -wq "$NAME"; then
+              echo "Updating Lambda function '$NAME' with code from $CODE_PATH..."
+              cd "$CODE_PATH"
+              zip -r function.zip .
+              BASE_ARN=$(echo "$FUNCTION_ARN" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
+              echo "Updating function code for $BASE_ARN"
+              aws lambda update-function-code --function-name "$BASE_ARN" --zip-file fileb://function.zip --region us-east-1
+              cd -
+            else
+              echo "No changes detected for $NAME; skipping update."
+            fi
+          done
 
+  # Update Lambdas for Prod deployment (publish version & update alias)
   update_lambda_prod:
     name: Update Lambda Functions (Prod)
     needs: check_lambda_changes
-    if: ${{ needs.check_lambda_changes.outputs.changed_functions != '' }}
+    if: ${{ needs.check_lambda_changes.outputs.updated != '' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
+        lambda: ${{ fromJson(needs.set-config.outputs.lambda_config) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -99,29 +116,39 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-region: us-east-1
-          aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
-          aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Update Primary Lambda Code and Publish (Prod)
-        if: ${{ contains(needs.check_lambda_changes.outputs.changed_functions, 'main') && matrix.api.codePath != '' }}
+      - name: Update and Publish Lambda Functions (Prod)
         run: |
-          echo "Updating primary Lambda for Prod API: ${{ matrix.api.functionName }} (main)"
-          cd "${{ matrix.api.codePath }}"
-          zip -r function.zip .
-          BASE_ARN=$(echo "${{ matrix.api.functionArn }}" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
-          aws lambda update-function-code --function-name "$BASE_ARN" --zip-file fileb://function.zip --region us-east-1
-          NEW_VERSION=$(aws lambda publish-version --function-name "$BASE_ARN" --region us-east-1 --query 'Version' --output text)
-          aws lambda update-alias --function-name "$BASE_ARN" --name prod --function-version "$NEW_VERSION" --region us-east-1
-          cd -
+          UPDATED="${{ needs.check_lambda_changes.outputs.updated }}"
+          echo "Updated functions: $UPDATED"
+          for lambda in $(jq -c '.lambdas[]' src/lambda-config.json); do
+            NAME=$(echo $lambda | jq -r '.name')
+            CODE_PATH=$(echo $lambda | jq -r '.codePath')
+            FUNCTION_ARN=$(echo $lambda | jq -r '.functionArn')
+            PROD_ALIAS=$(echo $lambda | jq -r '.prodAlias')
+            if echo "$UPDATED" | grep -wq "$NAME"; then
+              echo "Updating Lambda function '$NAME' for Prod using code from $CODE_PATH..."
+              cd "$CODE_PATH"
+              zip -r function.zip .
+              BASE_ARN=$(echo "$FUNCTION_ARN" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
+              aws lambda update-function-code --function-name "$BASE_ARN" --zip-file fileb://function.zip --region us-east-1
+              NEW_VERSION=$(aws lambda publish-version --function-name "$BASE_ARN" --region us-east-1 --query 'Version' --output text)
+              echo "Published new version $NEW_VERSION for $NAME"
+              aws lambda update-alias --function-name "$BASE_ARN" --name prod --function-version "$NEW_VERSION" --region us-east-1
+              cd -
+            else
+              echo "No changes detected for $NAME; skipping update."
+            fi
+          done
 
   prod_approval:
-    name: Production Approval Gate
+    name: Production Approval
     needs: update_lambda_prod
     runs-on: ubuntu-latest
     environment:
       name: Production
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
       - name: Manual Approval Step
-        run: echo "Production deployment approved. API has been updated."
+        run: echo "Production deployment approved. All updated Lambdas and CF templates have been deployed."
