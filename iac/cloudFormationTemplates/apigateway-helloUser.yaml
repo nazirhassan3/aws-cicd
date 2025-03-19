@@ -116,6 +116,7 @@ Resources:
       - ProductsMethod
       - CustomAuthorizer
       - usagePlan
+      - LambdaPermissionForAPIGateway
     Properties:
       RestApiId: !Ref RestApi
 
