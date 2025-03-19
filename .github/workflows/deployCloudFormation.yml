@@ -1,0 +1,65 @@
+name: Deploy APIs with Multi-Stage
+
+on:
+  push:
+    branches: nazir
+    paths:
+      - "src/cloudFormationTemplates/*.yaml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Detect Changed Templates
+        id: detect
+        run: |
+          PREVIOUS_COMMIT=${{ github.event.before }}
+          if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
+            PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
+          fi
+
+          echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
+
+          if [ -z "$PREVIOUS_COMMIT" ]; then
+            CHANGED_FILES=$(git ls-files | grep '^src/cloudFormationTemplates/' || true)
+          else
+            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/cloudFormationTemplates/' || true)
+          fi
+
+          CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) | map(.) // []')
+
+            # Ensure proper JSON output
+            if [ -z "$CHANGED_TEMPLATES" ] || [ "$CHANGED_TEMPLATES" = "null" ]; then
+              CHANGED_TEMPLATES="[]"
+            fi
+
+          echo "Detected changed TEMPLATES: $CHANGED_TEMPLATES"
+          echo "::set-output name=files::$CHANGED_TEMPLATES"
+          # echo "TEMPLATES=$CHANGED_TEMPLATES" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Changed CF Templates
+        if: steps.detect.outputs.files != ''
+        run: |
+          files="${{ steps.cffiles.outputs.files }}"
+          echo "Deploying the following CloudFormation templates:"
+          echo "$files"
+          for file in $files; do
+            # Construct a stack name from the template file name (without extension)
+            stackName=$(basename "$file" .yaml)
+            echo "Deploying template: $file to stack: $stackName"
+            aws cloudformation deploy \
+              --stack-name "$stackName" \
+              --template-file "$file" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region us-east-1
+          done
+
+      - name: No CF Templates Changed
+        if: steps.cffiles.outputs.files == ''
+        run: echo "No CloudFormation template changes detected. Skipping deployment."
