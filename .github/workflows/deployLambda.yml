@@ -93,6 +93,13 @@ jobs:
           BUCKET_NAME=naz-lambda
           ZIP_FILE="${FUNCTION_NAME}.zip"
           cd src/lambda-functions/${{ matrix.function }}
+          # Read the configuration from the file
+          CONFIG=$(cat "src/lambda-functions/${{ matrix.function }}/config.json")
+          FUNCTION_NAME_CONFIG=$(echo "$CONFIG" | jq -r '.functionName')
+          FUNCTION_ARN_CONFIG=$(echo "$CONFIG" | jq -r '.functionArn')
+          DEV_ALIAS_CONFIG=$(echo "$CONFIG" | jq -r '.devAlias')
+          PROD_ALIAS_CONFIG=$(echo "$CONFIG" | jq -r '.prodAlias')
+          echo "functionARn from config $FUNCTION_NAME_CONFIG"
           if [ -f "package.json" ]; then
             RUNTIME="nodejs18.x" #change to X
           else
