@@ -2,10 +2,9 @@ name: Update Lambda Functions on Code Change
 
 on:
   push:
-    branches: [main]
+    branches: nazir
     paths:
-      - "lambda-functions/**"
-      - "lambda-config.json"
+      - "src/**"
   workflow_dispatch:
 
 jobs:
@@ -21,7 +20,7 @@ jobs:
         id: read
         run: |
           # Read the lambda configuration file and output it as JSON.
-          CONFIG=$(cat lambda-config.json)
+          CONFIG=$(cat src/lambda-config.json)
           echo "lambda_matrix=$CONFIG" >> $GITHUB_OUTPUT
 
   check_lambda_changes:
