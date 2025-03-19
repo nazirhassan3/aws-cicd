@@ -48,7 +48,7 @@ jobs:
             # Construct a stack name from the template file name (without extension)
             stackName=$(basename "$file" .yaml)
             echo "File name: $file"
-            template=$(echo "$file" | jq -r '.[0]')
+            template=$(echo "$file" | sed 's/^\[//; s/\]$//')
             echo "Deploying template: $template to stack: $stackName"
             aws cloudformation deploy \
               --stack-name "$stackName" \
