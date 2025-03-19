@@ -41,6 +41,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
       - name: Check for Lambda Code Changes
         id: check
         run: |
@@ -128,7 +129,7 @@ jobs:
   # Update Lambdas for Prod deployment (publish version & update alias)
   update_lambda_prod:
     name: Update Lambda Functions (Prod)
-    needs: check_lambda_changes
+    needs: [check_lambda_changes, set-config]
     if: ${{ needs.check_lambda_changes.outputs.updated != '' }}
     runs-on: ubuntu-latest
     strategy:
