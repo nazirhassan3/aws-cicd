@@ -73,7 +73,7 @@ jobs:
           # Remove any leading comma
           updated_list=$(echo "$updated_list" | sed 's/^,//')
           echo "Updated Lambdas: $updated_list"
-          echo "::set-output updated=changed_functions::$updated_list"
+          echo "::set-output name=updated::$updated_list"
 
   # Update Lambdas for Dev deployment (update $LATEST code)
   update_lambda_dev:
