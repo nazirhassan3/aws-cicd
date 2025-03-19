@@ -76,7 +76,7 @@ jobs:
     name: Deploy to Production (Manual Approval Required)
     needs: detect-changed
     runs-on: ubuntu-latest
-    if: ${{ fromJson(needs.detect-changed.outputs.matrix) != {} }}
+    if: ${{ fromJson(needs.detect-changed.outputs.matrix) != null }}
     environment:
       name: production
     strategy:
