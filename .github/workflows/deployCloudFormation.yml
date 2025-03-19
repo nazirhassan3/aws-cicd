@@ -49,6 +49,7 @@ jobs:
         if: steps.detect.outputs.TEMPLATES != ''
         run: |
           # Extract each file path from the JSON array.
+          echo "Raw TEMPLATES: ${{ steps.detect.outputs.TEMPLATES }}"
           FILES=$(echo "${{ steps.detect.outputs.TEMPLATES }}" | jq -r '.[]')
           echo "Deploying the following CloudFormation templates:"
           echo "$FILES"
