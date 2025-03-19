@@ -27,9 +27,9 @@ jobs:
           echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
 
           if [ -z "$PREVIOUS_COMMIT" ]; then
-            CHANGED_FILES=$(git ls-files | grep '^src/cloudFormationTemplates' || true)
+            CHANGED_FILES=$(git ls-files | grep '^cloudFormationTemplates/.*\.yaml$' || true)
           else
-            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^src/cloudFormationTemplates' || true)
+            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^cloudFormationTemplates/.*\.yaml$' || true)
           fi
 
           CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | cut -d '/' -f 2 | sort -u | jq -R -s -c 'split("\n")[:-1] | select(length > 0) | map(.) // []')
