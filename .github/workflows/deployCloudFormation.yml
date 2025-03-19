@@ -47,10 +47,11 @@ jobs:
           for file in $files; do
             # Construct a stack name from the template file name (without extension)
             stackName=$(basename "$file" .yaml)
-            echo "Deploying template: $file to stack: $stackName"
+            template=$(echo "$file" | jq -r '.[0]')
+            echo "Deploying template: $template to stack: $stackName"
             aws cloudformation deploy \
               --stack-name "$stackName" \
-              --template-file "$file" \
+              --template-file "$template" \
               --capabilities CAPABILITY_NAMED_IAM \
               --region us-east-1
           done
