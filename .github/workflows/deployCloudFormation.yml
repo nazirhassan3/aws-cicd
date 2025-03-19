@@ -38,6 +38,13 @@ jobs:
           echo "Detected changed TEMPLATES: $CHANGED_TEMPLATES"
           echo "TEMPLATES=$CHANGED_TEMPLATES" >> "$GITHUB_OUTPUT"
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+
       - name: Deploy Changed CF Templates
         if: steps.detect.outputs.TEMPLATES != ''
         run: |
