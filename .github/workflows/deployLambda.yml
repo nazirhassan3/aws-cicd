@@ -21,7 +21,7 @@ jobs:
       - name: Read Lambda Configurations
         id: read
         run: |
-          CONFIG=$(cat lambda-config.json)
+          CONFIG=$(cat src/lambda-config.json)
           echo "lambda_config=$(echo "$CONFIG" | jq -c .)" >> $GITHUB_OUTPUT
 
       - name: Debug Lambda Config
