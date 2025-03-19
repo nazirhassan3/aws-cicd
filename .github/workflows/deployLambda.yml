@@ -94,6 +94,7 @@ jobs:
           ZIP_FILE="${FUNCTION_NAME}.zip"
           # Read the configuration from the file
           CONFIG=$(cat "src/lambda-functions/${{ matrix.function }}/config.json")
+          echo "CONFIG $CONFIG"
           cd src/lambda-functions/${{ matrix.function }}
           FUNCTION_NAME_CONFIG=$(echo "$CONFIG" | jq -r '.functionName')
           FUNCTION_ARN_CONFIG=$(echo "$CONFIG" | jq -r '.functionArn')
