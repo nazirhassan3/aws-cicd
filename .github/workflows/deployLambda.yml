@@ -1,74 +1,100 @@
-name: Deploy Updated Lambda Functions
+name: Deploy Changed Lambda Functions
 
 on:
   push:
-    branches: nazir
+    branches:
+      - main
     paths:
-      - "src/**"
-  workflow_dispatch:
+      - "src/lambda-functions/**"
 
 jobs:
-  update-lambdas:
-    name: Update Lambda Functions from Folder Configurations
+  # Job to detect changes and dynamically build a matrix of changed lambda functions.
+  detect-changed:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      - name: List Lambda Directories
+      - name: Detect changed lambda functions
+        id: set-matrix
         run: |
-          echo "Listing lambda function directories:"
-          find src/lambda-functions -mindepth 2 -maxdepth 2 -type d
-
-      - name: Update Lambdas if Code Changed
-        id: update
-        run: |
-          # Get previous commit (fallback to HEAD^ if needed)
-          PREV_COMMIT="${{ github.event.before }}"
-          if [ -z "$PREV_COMMIT" ] || ! git rev-parse --verify "$PREV_COMMIT" >/dev/null 2>&1; then
-            PREV_COMMIT=$(git rev-parse HEAD^ || echo "")
+          echo "Detecting changed lambda functions..."
+          # Get changed files between the previous and current commits
+          CHANGED=$(git diff --name-only "${{ github.event.before }}" "${{ github.event.after }}")
+          echo "Changed files:"
+          echo "$CHANGED"
+          # Filter for files in the lambda-functions directory and extract the top-level folder names
+          CHANGED_LAMBDAS=$(echo "$CHANGED" | grep '^src/lambda-functions/' | cut -d'/' -f3 | sort | uniq)
+          echo "Changed lambda function directories:"
+          echo "$CHANGED_LAMBDAS"
+          if [ -z "$CHANGED_LAMBDAS" ]; then
+            echo "No changes detected in lambda functions."
+            echo "::set-output name=matrix::{}"
+          else
+            # Build a JSON matrix in the form: { "include": [ { "function_dir": "func1" }, { "function_dir": "func2" } ] }
+            MATRIX_JSON=$(echo "$CHANGED_LAMBDAS" | jq -R -s -c 'split("\n") | map(select(. != "")) | map({function_dir: .}) | {include: .}')
+            echo "Matrix JSON: $MATRIX_JSON"
+            echo "::set-output name=matrix::$MATRIX_JSON"
           fi
-          echo "Comparing $PREV_COMMIT with ${{ github.sha }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          # Loop over each lambda directory that contains a config.json
-          for dir in $(find lambda-functions -mindepth 2 -maxdepth 2 -type d); do
-            if [ -f "$dir/config.json" ]; then
-              echo "Processing directory: $dir"
-              # Read the configuration from the file
-              CONFIG=$(cat "$dir/config.json")
-              FUNCTION_NAME=$(echo "$CONFIG" | jq -r '.functionName')
-              FUNCTION_ARN=$(echo "$CONFIG" | jq -r '.functionArn')
-              DEV_ALIAS=$(echo "$CONFIG" | jq -r '.devAlias')
-              PROD_ALIAS=$(echo "$CONFIG" | jq -r '.prodAlias')
-              
-              # Check if any file in the directory has changed
-              if git diff --name-only "$PREV_COMMIT" "${{ github.sha }}" | grep -q "^$dir/"; then
-                echo "Changes detected in $FUNCTION_NAME (directory: $dir)"
-                cd "$dir"
-                zip -r function.zip .
-                BASE_ARN=$(echo "$FUNCTION_ARN" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
-                echo "Updating Lambda function code for $BASE_ARN (Dev deployment)"
-                aws lambda update-function-code --function-name "$BASE_ARN" --zip-file fileb://function.zip --region us-east-1
-                cd -
-              else
-                echo "No changes detected in $FUNCTION_NAME (directory: $dir); skipping."
-              fi
-            else
-              echo "No config.json found in $dir; skipping."
-            fi
-          done
-
-      - name: Debug Update Output
-        run: echo "Lambda update step complete."
-
-  prod-approval:
-    name: Production Approval
-    needs: update-lambdas
+  # Job to deploy the changed lambda functions (e.g. to a staging or test environment)
+  deploy:
+    needs: detect-changed
     runs-on: ubuntu-latest
-    environment:
-      name: Production
+    # Only run if there is a non-empty matrix
+    if: ${{ fromJson(needs.detect-changed.outputs.matrix) != {} }}
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changed.outputs.matrix) }}
     steps:
-      - name: Manual Approval Step
-        run: echo "Production deployment approved. You can now deploy your production stacks."
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy Lambda Function - ${{ matrix.function_dir }}
+        working-directory: src/lambda-functions/${{ matrix.function_dir }}
+        run: |
+          echo "Deploying function: ${{ matrix.function_dir }}..."
+          # (Optional) Read and use configuration from a per-function config file here, e.g., config.json
+          # Package the function code
+          zip -r function.zip .
+          # Update the Lambda function code. Adjust the function name as needed.
+          aws lambda update-function-code --function-name my-${{ matrix.function_dir }} --zip-file fileb://function.zip
+
+  # Job to deploy to production; note that this job uses an environment (named "production")
+  # which should be configured in your repository settings to require manual approval.
+  deploy-prod:
+    name: Deploy to Production (Manual Approval Required)
+    needs: detect-changed
+    runs-on: ubuntu-latest
+    if: ${{ fromJson(needs.detect-changed.outputs.matrix) != {} }}
+    environment:
+      name: production
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changed.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS credentials for Prod
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy Lambda Function to Production - ${{ matrix.function_dir }}
+        working-directory: src/lambda-functions/${{ matrix.function_dir }}
+        run: |
+          echo "Deploying function: ${{ matrix.function_dir }} to production..."
+          zip -r function.zip .
+          aws lambda update-function-code --function-name prod-${{ matrix.function_dir }} --zip-file fileb://function.zip
