@@ -20,7 +20,7 @@ jobs:
       - name: List Lambda Directories
         run: |
           echo "Listing lambda function directories:"
-          find lambda-functions -mindepth 2 -maxdepth 2 -type d
+          find src/lambda-functions -mindepth 2 -maxdepth 2 -type d
 
       - name: Update Lambdas if Code Changed
         id: update
