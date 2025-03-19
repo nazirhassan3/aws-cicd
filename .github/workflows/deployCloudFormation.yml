@@ -33,7 +33,7 @@ jobs:
           fi
 
           # Use basename to extract just the file name, sort them, and output as JSON.
-          CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | xargs -n 1 basename | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | sort -u | jq -R -s -c 'split("\n")[:-1]')
 
           echo "Detected changed TEMPLATES: $CHANGED_TEMPLATES"
           echo "TEMPLATES=$CHANGED_TEMPLATES" >> "$GITHUB_OUTPUT"
