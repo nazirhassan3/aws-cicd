@@ -1,30 +1,18 @@
 {
-  "apis": [
+  "lambdas": [
     {
-      "api_name": "helloUser",
-      "stack_name": "helloUserStack",
-      "cf_template": [
-        "iac/helloUser-template.yaml",
-        "iac/helloWorld-template.yaml"
-      ],
-      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser",
-      "lambda_code_path": "src/helloUser",
-      "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
-      "lambda_dev_alias": "dev",
-      "lambda_prod_alias": "prod"
+      "functionName": "helloUser",
+      "functionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser",
+      "codePath": "src/helloUser",
+      "devAlias": "dev",
+      "prodAlias": "prod"
     },
     {
-      "api_name": "helloWorld",
-      "stack_name": "helloWorldStack",
-      "cf_template": [
-        "iac/helloUser-template.yaml",
-        "iac/helloWorld-template.yaml"
-      ],
-      "lambda_function_arn": "arn:aws:lambda:us-east-1:443370673783:function:helloUser",
-      "lambda_code_path": "src/helloUser",
-      "authorizer_lambda_arn": "arn:aws:lambda:us-east-1:443370673783:function:auth",
-      "lambda_dev_alias": "dev",
-      "lambda_prod_alias": "prod"
+      "functionName": "helloWorld",
+      "functionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld",
+      "codePath": "src/helloWorld",
+      "devAlias": "dev",
+      "prodAlias": "prod"
     }
   ]
 }
