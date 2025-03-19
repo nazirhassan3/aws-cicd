@@ -74,7 +74,7 @@ Resources:
       MethodResponses:
         - StatusCode: "200"
 
-  # Resource: /orders integrated with an external HTTP endpoint Test
+  # Resource: /orders integrated with an external HTTP endpoint
   ProductsResource:
     Type: AWS::ApiGateway::Resource
     Properties:
