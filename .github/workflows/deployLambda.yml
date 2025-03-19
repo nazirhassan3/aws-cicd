@@ -5,7 +5,6 @@ on:
     branches: nazir
     paths:
       - "src/**"
-      - ".github/workflows/deployLambda.yml"
   workflow_dispatch:
 
 jobs:
@@ -59,7 +58,7 @@ jobs:
 
           updated_list=""
           # Loop over each lambda defined in your configuration file (assuming it is named lambda-config.json)
-          for lambda in $(jq -c '.lambdas[]' lambda-config.json); do
+          for lambda in $(jq -c '.lambdas[]' src/lambda-config.json); do
             NAME=$(echo "$lambda" | jq -r '.name')
             CODE_PATH=$(echo "$lambda" | jq -r '.codePath')
             # Skip if CODE_PATH is empty or null.
