@@ -75,6 +75,9 @@ jobs:
           echo "Updated Lambdas: $updated_list"
           echo "::set-output name=updated::$updated_list"
 
+      - name: Debug Changed Functions
+        run: echo "Changed functions ${{ needs.check_lambda_changes.outputs.updated }}"
+
   # Update Lambdas for Dev deployment (update $LATEST code)
   update_lambda_dev:
     name: Update Lambda Functions (Dev)
