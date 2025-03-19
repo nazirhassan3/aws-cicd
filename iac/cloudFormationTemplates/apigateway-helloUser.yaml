@@ -36,6 +36,7 @@ Resources:
     Properties:
       ApiStages:
         - ApiId: !Ref RestApi
+          Stage: "dev"
       Description: Customer ABC's usage plan
       Quota:
         Limit: 5000
