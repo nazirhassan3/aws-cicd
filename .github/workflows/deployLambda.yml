@@ -17,13 +17,19 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
       - name: Read Lambda Configurations
         id: read
         run: |
           CONFIG=$(cat src/lambda-config.json)
+          echo "Configuration file content:"
+          echo "$CONFIG"
           echo "lambda_config<<EOF" >> $GITHUB_OUTPUT
           echo "$CONFIG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Debug Lambda Config
+        run: echo "Lambda config: ${{ steps.set-config.outputs.lambda_config }}"
 
   # Check for changes in each lambda code directory
   check_lambda_changes:
