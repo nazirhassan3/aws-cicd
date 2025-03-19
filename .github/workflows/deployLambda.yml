@@ -92,9 +92,9 @@ jobs:
           FUNCTION_NAME=${{ matrix.function }}
           BUCKET_NAME=naz-lambda
           ZIP_FILE="${FUNCTION_NAME}.zip"
-          cd src/lambda-functions/${{ matrix.function }}
           # Read the configuration from the file
           CONFIG=$(cat "src/lambda-functions/${{ matrix.function }}/config.json")
+          cd src/lambda-functions/${{ matrix.function }}
           FUNCTION_NAME_CONFIG=$(echo "$CONFIG" | jq -r '.functionName')
           FUNCTION_ARN_CONFIG=$(echo "$CONFIG" | jq -r '.functionArn')
           DEV_ALIAS_CONFIG=$(echo "$CONFIG" | jq -r '.devAlias')
