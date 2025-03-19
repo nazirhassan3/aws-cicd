@@ -2,13 +2,12 @@ name: Deploy APIs with Multi-Stage
 
 on:
   push:
-    branches: bilal
+    branches: nazir
     paths:
       - "iac/params/apis.json"
       - "iac/cloudformation-api.base.yaml"
       - "iac/generate_resources.py"
       - "src/**"
-      - ".github/**"
   workflow_dispatch:
 
 jobs:
@@ -26,8 +25,8 @@ jobs:
           MATRIX=$(jq -c '.apis' iac/params/apis.json)
           echo "api_matrix=$MATRIX" >> $GITHUB_OUTPUT
 
-  update_lambda_code:
-    name: Update Lambda Code
+  deploy_api_dev:
+    name: Deploy API (Dev)
     needs: set-matrix
     runs-on: ubuntu-latest
     strategy:
@@ -36,33 +35,60 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-region: us-east-1
           aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-      - name: Package and Upload Lambda Code
+
+      - name: Update Lambda Code (Dev)
+        if: ${{ matrix.api_config.lambda_code_path != '' }}
         run: |
-          FUNCTION_NAME=${{ matrix.api_config.api_name }}
-          BUCKET_NAME=naz-lambda
-          ZIP_FILE="${FUNCTION_NAME}.zip"
-          echo "Packaging Lambda code for API: $FUNCTION_NAME"
+          echo "Packaging Lambda code for API: ${{ matrix.api_config.api_name }}"
           cd "${{ matrix.api_config.lambda_code_path }}"
-          zip -r ../../${FUNCTION_NAME}.zip .
-          cd -
-          echo "Uploading ${FUNCTION_NAME}.zip to S3 bucket ${BUCKET_NAME}"
-          aws s3 cp $FUNCTION_NAME.zip s3://$BUCKET_NAME/
-      - name: Update Lambda Function Code
+          zip -r ../../${{ matrix.api_config.api_name }}.zip .
+          # Strip any alias/version from the ARN so that update-function-code works
+          # BASE_FUNCTION_ARN=$(echo "${{ matrix.api_config.lambda_function_arn }}" | awk -F: '{OFS=":"; print $1,$2,$3,$4,$5,$6,$7}')
+          # echo "Updating Lambda function code for $BASE_FUNCTION_ARN"
+          # aws lambda update-function-code --function-name "$BASE_FUNCTION_ARN" --zip-file fileb://function.zip --region us-east-1
+          # cd -
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp ${{ matrix.api_config.api_name }}.zip s3://naz-lambda/
+
+      - name: Deploy Lambda Function (Create or Update)
         run: |
           FUNCTION_NAME=${{ matrix.api_config.api_name }}
           BUCKET_NAME=naz-lambda
           ZIP_FILE="${FUNCTION_NAME}.zip"
-          echo "Updating Lambda function code for $FUNCTION_NAME"
-          aws lambda update-function-code \
-            --function-name $FUNCTION_NAME \
-            --s3-bucket $BUCKET_NAME \
-            --s3-key $ZIP_FILE
+          cd "${{ matrix.api_config.lambda_code_path }}"
+          if [ -f "package.json" ]; then
+            RUNTIME="nodejs18.x" #change to X
+          else
+            RUNTIME="python3.13"
+          fi
+          HANDLER="lambda_function.lambda_handler"  
+          ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
+          echo "Checking if Lambda function $FUNCTION_NAME exists..."
+          FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
+          if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
+            echo "Function does not exist. Creating..."
+            aws lambda create-function \
+              --function-name $FUNCTION_NAME \
+              --runtime $RUNTIME \
+              --role $ROLE_ARN \
+              --handler $HANDLER \
+              --code S3Bucket=$BUCKET_NAME,S3Key=$ZIP_FILE \
+              --timeout 10 \
+              --memory-size 128
+          else
+            echo "Function exists. Updating..."
+            aws lambda update-function-code --function-name ${FUNCTION_NAME} --s3-bucket naz-lambda --s3-key ${FUNCTION_NAME}.zip
+          fi
+
       - name: Wait for Lambda Update to Complete
         run: |
           FUNCTION_NAME=${{ matrix.api_config.api_name }}
@@ -73,47 +99,16 @@ jobs:
             STATUS=$(aws lambda get-function-configuration --function-name $FUNCTION_NAME --query "State" --output text)
             echo "Current Status: $STATUS"
           done
-          echo "Lambda function $FUNCTION_NAME is now Active."
-
-  deploy_api_nonprod:
-    name: Deploy API (Dev & QA)
-    needs: [set-matrix, update_lambda_code]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        stage: [dev, qa]
-        api_config: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-region: us-east-1
-          aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
-          aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          echo "Lambda function is now Active."
 
       - name: Ensure Alias Exists and Update
         run: |
           FUNCTION_NAME=${{ matrix.api_config.api_name }}
-          ALIAS_NAME="${{ matrix.stage }}"
-          RETRIES=0
-          MAX_RETRIES=5
-          while [ $RETRIES -lt $MAX_RETRIES ]; do
-            RESULT=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text 2>&1)
-            if echo "$RESULT" | grep -q "ResourceConflictException"; then
-              echo "Update in progress for $FUNCTION_NAME. Retrying in 10 seconds..."
-              sleep 10
-              RETRIES=$((RETRIES+1))
-            else
-              VERSION=$RESULT
-              break
-            fi
-          done
-          if [ -z "$VERSION" ]; then
-            echo "Failed to publish version after multiple attempts." && exit 1
-          fi
-          ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='${ALIAS_NAME}']" --output text)
+          ALIAS_NAME="dev"
+          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+
+          ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
+
           if [[ -z "$ALIAS_EXISTS" ]]; then
             echo "Alias '$ALIAS_NAME' does not exist. Creating it..."
             aws lambda create-alias \
@@ -127,19 +122,21 @@ jobs:
               --name $ALIAS_NAME \
               --function-version $VERSION
           fi
+
           echo "Alias '$ALIAS_NAME' now points to version $VERSION"
 
       - name: Check and Add Lambda Permission
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
           AWS_REGION=us-east-1
-          ALIAS=${{ matrix.stage }}
+          ALIAS=dev
           API_ID=$(aws apigateway get-rest-apis --query "items[?name=='${{ matrix.api_config.api_name }}'].id | [0]" --output text)
           LAMBDA_ARN=$(echo "${{ matrix.api_config.lambda_function_arn }}")
           echo "Lambda ARN: $LAMBDA_ARN"
           SOURCE_ARN=arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/GET/*
+          # Try to get the current policy for the Lambda function
           POLICY=$(aws lambda get-policy --function-name "$LAMBDA_ARN" --region "$AWS_REGION" 2>/dev/null)
-          STATEMENT_ID=${{ matrix.api_config.api_name }}-${{ matrix.stage }}
+          STATEMENT_ID=${{ matrix.api_config.api_name }}-dev  
           if [ -z "$POLICY" ]; then
             echo "No existing policy found. Adding permission..."
             aws lambda add-permission \
@@ -150,6 +147,7 @@ jobs:
               --source-arn "$SOURCE_ARN" \
               --region "$AWS_REGION"
           else
+            # Extract the policy document and check for the statement ID
             EXISTS=$(echo "$POLICY" | jq -r --arg sid "$STATEMENT_ID" '.Policy | fromjson | .Statement[] | select(.Sid==$sid) | .Sid' 2>/dev/null)
             if [ "$EXISTS" == "$STATEMENT_ID" ]; then
               echo "Permission with StatementId '$STATEMENT_ID' already exists for $LAMBDA_ARN."
@@ -167,11 +165,14 @@ jobs:
 
       - name: Generate Dynamic Resources
         run: |
+          # Write the dynamic resource definitions (if provided in the API config)
+          # We assume the API config includes a "resource_paths" key which is an array.
           echo '${{ toJson(matrix.api_config.resource_paths) }}' > iac/params/current_resource_paths.json
           python iac/generate_resources.py iac/params/current_resource_paths.json > iac/generated_resources.yaml
 
       - name: Merge Base Template with Dynamic Resources
         run: |
+          # Install yq if not already installed.
           sudo wget https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           yq eval-all '. as $item ireduce ({}; . * $item )' iac/cloudformation-api.base.yaml iac/generated_resources.yaml > iac/cloudformation-api.yaml
 
@@ -179,34 +180,36 @@ jobs:
         run: |
           aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region us-east-1
 
-      - name: Deploy CloudFormation Stack (Non-Prod)
+      - name: Deploy CloudFormation Stack (Dev)
         run: |
-          echo "Deploying API: ${{ matrix.api_config.api_name }} with stack: ${{ matrix.api_config.stack_name }}-${{ matrix.stage }} to stage: ${{ matrix.stage }}"
+          echo "Deploying API: ${{ matrix.api_config.api_name }} with stack: ${{ matrix.api_config.stack_name }}"
           aws cloudformation deploy \
-            --stack-name "${{ matrix.api_config.stack_name }}-${{ matrix.stage }}" \
+            --stack-name "${{ matrix.api_config.stack_name }}" \
             --template-file iac/cloudformation-api.yaml \
-            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} StageName=${{ matrix.stage }} \
+            --parameter-overrides ApiName=${{ matrix.api_config.api_name }} LambdaFunctionArn=${{ matrix.api_config.lambda_function_arn }} HtmlEndpoint=${{ matrix.api_config.html_endpoint }} AuthorizerLambdaArn=${{ matrix.api_config.authorizer_lambda_arn }} LambdaDevAlias=${{ matrix.api_config.lambda_dev_alias }} LambdaProdAlias=${{ matrix.api_config.lambda_prod_alias }} StageName=dev \
             --capabilities CAPABILITY_NAMED_IAM \
-            --region us-east-1 || ( echo "Failed to deploy stack. Fetching events:" && aws cloudformation describe-stack-events --stack-name "${{ matrix.api_config.stack_name }}-${{ matrix.stage }}" --region us-east-1 && exit 1 )
+            --region us-east-1
 
   deploy_api_prod:
     name: Deploy API (Prod)
     needs: set-matrix
     runs-on: ubuntu-latest
     environment:
-      name: Production
+      name: Production # Configure the "Production" environment in GitHub with manual approval.
     strategy:
       matrix:
         api_config: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-region: us-east-1
           aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+
       - name: Update Lambda Code (Prod)
         if: ${{ matrix.api_config.lambda_code_path != '' }}
         run: |
@@ -217,17 +220,21 @@ jobs:
           echo "Updating Lambda function code for $BASE_FUNCTION_ARN"
           aws lambda update-function-code --function-name "$BASE_FUNCTION_ARN" --zip-file fileb://function.zip --region us-east-1
           cd -
+
       - name: Generate Dynamic Resources
         run: |
           echo '${{ toJson(matrix.api_config.resource_paths) }}' > iac/params/current_resource_paths.json
           python iac/generate_resources.py iac/params/current_resource_paths.json > iac/generated_resources.yaml
+
       - name: Merge Base Template with Dynamic Resources
         run: |
           sudo wget https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           yq eval-all '. as $item ireduce ({}; . * $item )' iac/cloudformation-api.base.yaml iac/generated_resources.yaml > iac/cloudformation-api.yaml
+
       - name: Validate CloudFormation Template
         run: |
           aws cloudformation validate-template --template-body file://iac/cloudformation-api.yaml --region us-east-1
+
       - name: Deploy CloudFormation Stack (Prod)
         run: |
           echo "Deploying API (Prod): ${{ matrix.api_config.api_name }} on stack: ${{ matrix.api_config.stack_name }}"
