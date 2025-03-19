@@ -11,18 +11,33 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
-      - name: Determine changed CF templates
-        id: cffiles
+      - name: Detect Changed Templates
+        id: detect
         run: |
-          echo "Finding changed CloudFormation templates in cfTemplates/ folder..."
-          # Use git diff to get changed files between the previous commit and current commit
-          changed_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep '^cloudFormationTemplates/.*\.yaml$' || true)
-          echo "Changed files: $changed_files"
-          # Set output; note that if there are no changes, changed_files will be empty.
-          echo "::set-output name=files::$changed_files"
+          PREVIOUS_COMMIT=${{ github.event.before }}
+          if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
+            PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
+          fi
+
+          echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
+
+          if [ -z "$PREVIOUS_COMMIT" ]; then
+            CHANGED_FILES=$(git ls-files | grep '^cloudFormationTemplates/.*\.yaml$' || true)
+          else
+            CHANGED_FILES=$(git diff --name-only $PREVIOUS_COMMIT ${{ github.sha }} | grep '^cloudFormationTemplates/.*\.yaml$' || true)
+          fi
+
+          # Use basename instead of cut to extract the file names.
+          CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | xargs -n 1 basename | sort -u | jq -R -s -c 'split("\n")[:-1]')
+
+          echo "Detected changed TEMPLATES: $CHANGED_TEMPLATES"
+          echo "::set-output name=files::$CHANGED_TEMPLATES"
+          # echo "TEMPLATES=$CHANGED_TEMPLATES" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Changed CF Templates
         if: steps.detect.outputs.files != ''
