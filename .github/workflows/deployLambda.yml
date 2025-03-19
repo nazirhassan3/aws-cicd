@@ -2,8 +2,11 @@ name: Deploy Updated Lambda Functions
 
 on:
   push:
-    branches:
-      - main
+    branches: nazir
+    paths:
+      - "src/**"
+      - ".github/**"
+  workflow_dispatch:
 
 jobs:
   detect_changes:
