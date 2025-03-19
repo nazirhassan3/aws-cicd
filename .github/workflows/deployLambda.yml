@@ -52,7 +52,7 @@ jobs:
 
           # Loop over each lambda configuration from lambda-config.json.
           for lambda in $(jq -c '.lambdas[]' src/lambda-config.json); do
-            NAME=$(echo "$lambda" | jq -r '.name')
+            NAME=$(echo "$lambda" | jq -r '.functionName')
             CODE_PATH=$(echo "$lambda" | jq -r '.codePath')
             
             # If CODE_PATH is "null" or empty, skip this lambda.
@@ -73,7 +73,7 @@ jobs:
           # Remove any leading comma
           updated_list=$(echo "$updated_list" | sed 's/^,//')
           echo "Updated Lambdas: $updated_list"
-          echo "::set-output name=updated::$updated_list"
+          echo "::set-output name=changed_functions::$updated_list"
 
   # Update Lambdas for Dev deployment (update $LATEST code)
   update_lambda_dev:
