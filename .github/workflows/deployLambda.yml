@@ -4,10 +4,10 @@ on:
   push:
     branches: nazir
     paths:
-      - "iac/params/apis.json"
-      - "iac/**/*.yaml"
-      - "src/**"
-      - ".github/**"
+      # - "iac/params/apis.json"
+      # - "iac/**/*.yaml"
+      # - "src/**"
+      # - ".github/**"
   workflow_dispatch:
 
 jobs:
