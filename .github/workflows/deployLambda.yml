@@ -94,20 +94,18 @@ jobs:
           ZIP_FILE="${FUNCTION_NAME}.zip"
           # Read the configuration from the file
           CONFIG=$(cat "src/lambda-functions/${{ matrix.function }}/config.json")
-          echo "CONFIG $CONFIG"
           cd src/lambda-functions/${{ matrix.function }}
-          FUNCTION_NAME_CONFIG=$(echo "$CONFIG" | jq -r '.functionName')
-          FUNCTION_ARN_CONFIG=$(echo "$CONFIG" | jq -r '.functionArn')
-          DEV_ALIAS_CONFIG=$(echo "$CONFIG" | jq -r '.devAlias')
+          RUNTIME=$(echo "$CONFIG" | jq -r '.runTimeEnv')
+          ROLE_ARN=$(echo "$CONFIG" | jq -r '.roleARN')
+          HANDLER=$(echo "$CONFIG" | jq -r '.handler')
           PROD_ALIAS_CONFIG=$(echo "$CONFIG" | jq -r '.prodAlias')
-          echo "functionARn from config $FUNCTION_NAME_CONFIG"
-          if [ -f "package.json" ]; then
-            RUNTIME="nodejs18.x" #change to X
-          else
-            RUNTIME="python3.13"
-          fi
-          HANDLER="lambda_function.lambda_handler"  
-          ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
+          # if [ -f "package.json" ]; then
+          #   RUNTIME="nodejs18.x" #change to X
+          # else
+          #   RUNTIME="python3.13"
+          # fi
+          # HANDLER="lambda_function.lambda_handler"  
+          # ROLE_ARN="arn:aws:iam::443370673783:role/basicLambdaRole"
           echo "Checking if Lambda function $FUNCTION_NAME exists..."
           FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME 2>&1 || echo "FunctionNotFound")
           if echo "$FUNCTION_EXISTS" | grep -q "FunctionNotFound"; then
