@@ -50,10 +50,10 @@ jobs:
         run: |
           cleaned=$(echo "$raw_templates" | sed 's/^\[//; s/\]$//')
           echo "Cleaned string: ${{ steps.detect.outputs.TEMPLATES }}"
-
+          echo "cleaned: $cleaned"
           # Split the cleaned string by comma into an array
           IFS=',' read -ra TEMPLATE_ARRAY <<< "$cleaned"
-          echo "Deploying template: $TEMPLATE_ARRAY"
+          echo "TEMPLATE_ARRAY: $TEMPLATE_ARRAY"
           # Iterate over each template file path
           for file in "${TEMPLATE_ARRAY[@]}"; do
             # Trim any extra whitespace
