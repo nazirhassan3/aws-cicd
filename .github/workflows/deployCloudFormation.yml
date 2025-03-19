@@ -41,7 +41,7 @@ jobs:
       - name: Deploy Changed CF Templates
         if: steps.detect.outputs.TEMPLATES != ''
         run: |
-          files="${{ steps.cffiles.outputs.TEMPLATES }}"
+          files="${{ steps.detect.outputs.TEMPLATES }}"
           echo "Deploying the following CloudFormation templates:"
           echo "$files"
           for file in $files; do
