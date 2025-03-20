@@ -7,22 +7,11 @@ Description: >
   Two stages are created, and the Lambda integration URI uses a stage variable to choose
   the appropriate Lambda alias (Dev or Prod).
 
-Parameters:
-  ApiName:
-    Type: String
-    Description: The name of the API Gateway API.
-  AuthorizerLambdaArn:
-    Type: String
-    Description: ARN of the Lambda function for the custom authorizer (base ARN only).
-  LambdaDevAlias:
-    Type: String
-    Description: Lambda alias to use in the Dev stage.
-
 Resources:
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: "HelloUser"
+      Name: "HelloWorld"
       Description: "API with multiple resource paths (users, orders, optional html) and two stages"
 
   CustomAuthorizer:
@@ -38,23 +27,23 @@ Resources:
         - - "arn:aws:apigateway:"
           - !Ref "AWS::Region"
           - ":lambda:path/2015-03-31/functions/"
-          - !Ref AuthorizerLambdaArn
+          - "arn:aws:lambda:us-east-1:443370673783:function:auth"
           - "/invocations"
       AuthorizerResultTtlInSeconds: 300
 
   # Resource: /users integrated with Lambda (using stage variable)
-  UsersResource:
+  WorldResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: users
+      PathPart: world
       RestApiId: !Ref RestApi
 
-  UsersMethod:
+  WorldMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref RestApi
-      ResourceId: !Ref UsersResource
+      ResourceId: !Ref WorldResource
       HttpMethod: GET
       AuthorizationType: CUSTOM
       AuthorizerId: !Ref CustomAuthorizer
@@ -66,7 +55,7 @@ Resources:
           - - "arn:aws:apigateway:"
             - !Ref "AWS::Region"
             - ":lambda:path/2015-03-31/functions/"
-            - "arn:aws:lambda:us-east-1:443370673783:function:helloUser"
+            - "arn:aws:lambda:us-east-1:443370673783:function:helloWorld"
             - ":"
             - "$"
             - "{stageVariables.lambdaAlias}"
@@ -74,33 +63,10 @@ Resources:
       MethodResponses:
         - StatusCode: "200"
 
-  # Resource: /orders integrated with an external HTTP endpoint
-  ProductsResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: products
-      RestApiId: !Ref RestApi
-
-  ProductsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ProductsResource
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        IntegrationHttpMethod: GET
-        Type: HTTP
-        Uri: "https://dummyjson.com/products"
-      MethodResponses:
-        - StatusCode: "200"
-
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - UsersMethod
-      - ProductsMethod
+      - WorldMethod
       - CustomAuthorizer
     Properties:
       RestApiId: !Ref RestApi
@@ -112,16 +78,7 @@ Resources:
       RestApiId: !Ref RestApi
       DeploymentId: !Ref ApiDeployment
       Variables:
-        lambdaAlias: !Ref LambdaDevAlias
-
-  QaStage:
-    Type: AWS::ApiGateway::Stage
-    Properties:
-      StageName: qa
-      RestApiId: !Ref RestApi
-      DeploymentId: !Ref ApiDeployment
-      Variables:
-        lambdaAlias: "qa"
+        lambdaAlias: "dev"
 
   ProdStage:
     Type: AWS::ApiGateway::Stage
@@ -136,9 +93,6 @@ Outputs:
   ApiUrlDev:
     Description: "Dev API URL"
     Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/dev"
-  ApiUrlQa:
-    Description: "QA API URL"
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/qa"
   ApiUrlProd:
     Description: "Prod API URL"
     Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
