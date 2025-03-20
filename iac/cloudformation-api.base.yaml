@@ -86,6 +86,15 @@ Resources:
       Variables:
         lambdaAlias: !Ref LambdaDevAlias
 
+  QaStage:
+  Type: AWS::ApiGateway::Stage
+  Properties:
+    StageName: qa
+    RestApiId: !Ref RestApi
+    DeploymentId: !Ref ApiDeployment
+    Variables:
+      lambdaAlias: "LambdaQaAlias"
+
   ProdStage:
     Type: AWS::ApiGateway::Stage
     Properties:
@@ -99,6 +108,9 @@ Outputs:
   ApiUrlDev:
     Description: "Dev API URL"
     Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/dev"
+  ApiUrlQa:
+    Description: "Qa API URL"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/qa"
   ApiUrlProd:
     Description: "Prod API URL"
     Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
