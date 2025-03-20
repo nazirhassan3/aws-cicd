@@ -24,6 +24,41 @@ Resources:
           - "arn:aws:lambda:us-east-1:443370673783:function:auth"
           - "/invocations"
 
+  usagePlan:
+    Type: "AWS::ApiGateway::UsagePlan"
+    DependsOn:
+      - QAStage
+      - ProdStage
+      - UATStage
+    Properties:
+      ApiStages:
+        - ApiId: !Ref RestApi
+          Stage: qa
+        - ApiId: !Ref RestApi
+          Stage: prod
+      Description: Customer ABC's usage plan
+      Quota:
+        Limit: 100000
+        Period: DAY
+      Throttle:
+        BurstLimit: 150
+        RateLimit: 300
+      UsagePlanName: Plan_ABC
+
+  MyApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: NissanUSA Integration QA
+      Description: "Widgets for NUSA integration"
+      Enabled: true
+
+  MyUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref MyApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref usagePlan
+
   LambdaPermissionForAPIGatewayDev:
     Type: AWS::Lambda::Permission
     Properties:
@@ -107,6 +142,7 @@ Resources:
       - FlushCacheOptionsMethod
       - FlushCachePostMethod
       - CustomAuthorizer
+      - QAStage
     Properties:
       RestApiId: !Ref RestApi
       Description: "Deployment version: new"
@@ -137,37 +173,6 @@ Resources:
       DeploymentId: !Ref ApiDeployment
       Variables:
         lambdaAlias: "uat"
-
-  usagePlan:
-    Type: "AWS::ApiGateway::UsagePlan"
-    Properties:
-      ApiStages:
-        - ApiId: !Ref RestApi
-          Stage: qa
-        - ApiId: !Ref RestApi
-          Stage: prod
-      Description: Customer ABC's usage plan
-      Quota:
-        Limit: 100000
-        Period: DAY
-      Throttle:
-        BurstLimit: 150
-        RateLimit: 300
-      UsagePlanName: Plan_ABC
-
-  MyApiKey:
-    Type: AWS::ApiGateway::ApiKey
-    Properties:
-      Name: NissanUSA Integration QA
-      Description: "Widgets for NUSA integration"
-      Enabled: true
-
-  MyUsagePlanKey:
-    Type: AWS::ApiGateway::UsagePlanKey
-    Properties:
-      KeyId: !Ref MyApiKey
-      KeyType: API_KEY
-      UsagePlanId: !Ref usagePlan
 
 Outputs:
   ApiUrlDev:
