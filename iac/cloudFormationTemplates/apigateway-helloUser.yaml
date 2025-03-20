@@ -107,7 +107,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ResourceId: !Ref ProductsResource
-      HttpMethod: POST
+      HttpMethod: GET
       AuthorizationType: NONE
       Integration:
         IntegrationHttpMethod: GET
