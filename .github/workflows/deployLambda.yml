@@ -225,5 +225,3 @@ jobs:
           workflow: "approve-and-deploy.yml"
           token: ${{ secrets.PAT_TOKEN }}
           inputs: '{"function": "${{ matrix.function }}"}'
-deployLambda.yml
-Displaying deployLambda.yml.
