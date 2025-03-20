@@ -49,7 +49,7 @@ Resources:
   LambdaPermissionForAPIGateway:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: "helloUser"
+      FunctionName: helloUser
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       # Replace <YourApiGatewayId> with your actual API Gateway ID or reference the API Gateway resource if defined in the template.
@@ -109,6 +109,13 @@ Resources:
       MethodResponses:
         - StatusCode: "200"
 
+  Deployment:
+    Type: "AWS::ApiGateway::Deployment"
+    Properties:
+      RestApiId: !Ref MyApi
+      Description: My deployment
+      StageName: dev
+
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -116,6 +123,7 @@ Resources:
       - ProductsMethod
       - CustomAuthorizer
       - usagePlan
+      - Deployment
       - LambdaPermissionForAPIGateway
     Properties:
       RestApiId: !Ref RestApi
