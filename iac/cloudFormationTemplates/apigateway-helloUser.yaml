@@ -125,6 +125,7 @@ Resources:
       - usagePlan
     Properties:
       RestApiId: !Ref RestApi
+      StageName: dev
 
   DevStage:
     Type: AWS::ApiGateway::Stage
@@ -143,18 +144,6 @@ Resources:
       DeploymentId: !Ref ApiDeployment
       Variables:
         lambdaAlias: "prod"
-
-  Deployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - UsersMethod
-      - ProductsMethod
-      - CustomAuthorizer
-      - usagePlan
-    Properties:
-      RestApiId: !Ref RestApi
-      Description: Development Stage New
-      StageName: dev
 
 Outputs:
   ApiUrlDev:
