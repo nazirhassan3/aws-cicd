@@ -146,6 +146,11 @@ Resources:
 
   Deployment:
     Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - UsersMethod
+      - ProductsMethod
+      - CustomAuthorizer
+      - usagePlan
     Properties:
       RestApiId: !Ref RestApi
       Description: Development Stage
