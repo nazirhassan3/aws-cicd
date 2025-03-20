@@ -125,7 +125,7 @@ Resources:
       - usagePlan
     Properties:
       RestApiId: !Ref RestApi
-      StageName: dev
+      StageName: "dev"
 
   DevStage:
     Type: AWS::ApiGateway::Stage
