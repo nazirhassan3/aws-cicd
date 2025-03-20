@@ -126,6 +126,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       Description: "Deployment version: new"
+      StageName: dev
 
   DevStage:
     Type: AWS::ApiGateway::Stage
