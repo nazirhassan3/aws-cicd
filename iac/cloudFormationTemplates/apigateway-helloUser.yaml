@@ -110,10 +110,10 @@ Resources:
         - StatusCode: "200"
 
   Deployment:
-    Type: "AWS::ApiGateway::Deployment"
+    Type: AWS::ApiGateway::Deployment
     Properties:
-      RestApiId: !Ref MyApi
-      Description: My deployment
+      RestApiId: !Ref RestApi
+      Description: Development Stage
       StageName: dev
 
   ApiDeployment:
