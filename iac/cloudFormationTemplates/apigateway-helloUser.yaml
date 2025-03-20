@@ -36,7 +36,7 @@ Resources:
     Properties:
       ApiStages:
         - ApiId: !Ref RestApi
-          Stage: dev
+          Stage: "dev"
       Description: Customer ABC's usage plan
       Quota:
         Limit: 500
@@ -153,7 +153,7 @@ Resources:
       - usagePlan
     Properties:
       RestApiId: !Ref RestApi
-      Description: Development Stage
+      Description: !Sub "Deployment triggered at ${AWS::Timestamp}"
       StageName: dev
 
 Outputs:
