@@ -266,44 +266,44 @@ jobs:
               --region us-east-1
           done
 
-  # deploy_api_qa:
-  #   name: Deploy CF Stacks (QA)
-  #   needs: [set-matrix, check_lambda_changes, update_lambda_dev]
-  #   if: needs.check_lambda_changes.outputs.functions != '[]'
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     matrix:
-  #       api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
-  #   steps:
-  #     - name: Checkout Code
-  #       uses: actions/checkout@v3
+  deploy_api_qa:
+    name: Deploy CF Stacks (QA)
+    needs: [set-matrix, check_lambda_changes, update_lambda_dev]
+    if: needs.check_lambda_changes.outputs.functions != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        api: ${{ fromJson(needs.set-matrix.outputs.api_matrix) }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         aws-region: us-east-1
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-  #     - name: Deploy CF Templates (QA)
-  #       run: |
-  #         TEMPLATES=$(echo '${{ toJson(matrix.api.cf_template) }}' | jq -r '.[]')
-  #         for template in $TEMPLATES; do
-  #           SUFFIX=$(basename "$template" .yaml)
-  #           STACK_NAME="${{ matrix.api.stack_name }}-${SUFFIX}-QA"
-  #           echo "Deploying template $template to stack $STACK_NAME"
-  #           aws cloudformation deploy \
-  #             --stack-name "$STACK_NAME" \
-  #             --template-file "$template" \
-  #             --parameter-overrides ApiName=${{ matrix.api.api_name }} \
-  #                                   PrimaryLambdaFunctionArn=${{ matrix.api.primary_lambda_function_arn }} \
-  #                                   HtmlEndpoint=${{ matrix.api.html_endpoint }} \
-  #                                   AuthorizerLambdaArn=${{ matrix.api.authorizer_lambda_arn }} \
-  #                                   # Optionally pass a QA alias parameter if your template supports it:
-  #                                   LambdaQaAlias=qa \
-  #             --capabilities CAPABILITY_NAMED_IAM \
-  #             --region us-east-1
-  #         done
+      - name: Deploy CF Templates (QA)
+        run: |
+          TEMPLATES=$(echo '${{ toJson(matrix.api.cf_template) }}' | jq -r '.[]')
+          for template in $TEMPLATES; do
+            SUFFIX=$(basename "$template" .yaml)
+            STACK_NAME="${{ matrix.api.stack_name }}-${SUFFIX}-QA"
+            echo "Deploying template $template to stack $STACK_NAME"
+            aws cloudformation deploy \
+              --stack-name "$STACK_NAME" \
+              --template-file "$template" \
+              --parameter-overrides ApiName=${{ matrix.api.api_name }} \
+                                    PrimaryLambdaFunctionArn=${{ matrix.api.primary_lambda_function_arn }} \
+                                    HtmlEndpoint=${{ matrix.api.html_endpoint }} \
+                                    AuthorizerLambdaArn=${{ matrix.api.authorizer_lambda_arn }} \
+                                    # Optionally pass a QA alias parameter if your template supports it:
+                                    LambdaQaAlias=qa \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region us-east-1
+          done
 
   # deploy_api_prod:
   #   name: Deploy API (Prod)
