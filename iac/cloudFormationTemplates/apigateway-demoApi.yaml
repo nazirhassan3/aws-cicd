@@ -142,7 +142,6 @@ Resources:
       - FlushCacheOptionsMethod
       - FlushCachePostMethod
       - CustomAuthorizer
-      - QAStage
     Properties:
       RestApiId: !Ref RestApi
       Description: "Deployment version: new"
