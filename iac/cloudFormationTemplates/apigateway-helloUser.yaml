@@ -52,7 +52,14 @@ Resources:
       FunctionName: helloUser:dev
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      # Replace <YourApiGatewayId> with your actual API Gateway ID or reference the API Gateway resource if defined in the template.
+      SourceArn: !Sub "arn:aws:execute-api:us-east-1:443370673783:${RestApi}/*/*/*"
+
+  LambdaPermissionForAPIGateway:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: helloUser:prod
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:us-east-1:443370673783:${RestApi}/*/*/*"
 
   # Resource: /users integrated with Lambda (using stage variable)
@@ -124,7 +131,6 @@ Resources:
       - CustomAuthorizer
       - usagePlan
       - Deployment
-      - LambdaPermissionForAPIGateway
     Properties:
       RestApiId: !Ref RestApi
 
