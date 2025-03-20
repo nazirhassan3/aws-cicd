@@ -46,7 +46,7 @@ Resources:
         RateLimit: 100
       UsagePlanName: Plan_ABC
 
-  LambdaPermissionForAPIGateway:
+  LambdaPermissionForAPIGatewayDev:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: helloUser:dev
@@ -54,7 +54,7 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:us-east-1:443370673783:${RestApi}/*/*/*"
 
-  LambdaPermissionForAPIGateway:
+  LambdaPermissionForAPIGatewayProd:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: helloUser:prod
