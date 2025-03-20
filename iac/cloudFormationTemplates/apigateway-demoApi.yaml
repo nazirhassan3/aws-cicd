@@ -29,7 +29,7 @@ Resources:
     Properties:
       ApiStages:
         - ApiId: !Ref RestApi
-          Stage: dev
+          Stage: qa
         - ApiId: !Ref RestApi
           Stage: prod
       Description: Customer ABC's usage plan
