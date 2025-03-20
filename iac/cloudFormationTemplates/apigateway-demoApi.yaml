@@ -55,21 +55,6 @@ Resources:
       KeyType: API_KEY
       UsagePlanId: !Ref usagePlan
 
-  # Define an "Empty" model for application/json responses.
-  EmptyModel:
-    Type: AWS::ApiGateway::Model
-    Properties:
-      RestApiId: !Ref RestApi
-      Name: Empty
-      ContentType: application/json
-      Description: "Empty model for responses"
-      "Schema":
-        {
-          "$schema": "http://json-schema.org/draft-04/schema#",
-          "title": "Empty Schema",
-          "type": "object",
-        }
-
   LambdaPermissionForAPIGatewayDev:
     Type: AWS::Lambda::Permission
     Properties:
