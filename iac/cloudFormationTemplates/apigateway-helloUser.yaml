@@ -41,14 +41,14 @@ Resources:
       ApiStages:
         - ApiId: !Ref RestApi
           Stage: "dev"
-      Description: Customer ABC's usage plan
+      Description: Usage plan for hello User
       Quota:
         Limit: 500
         Period: MONTH
       Throttle:
         BurstLimit: 200
         RateLimit: 100
-      UsagePlanName: Plan_ABC
+      UsagePlanName: Dummy Plan
 
   LambdaPermissionForAPIGatewayDev:
     Type: AWS::Lambda::Permission
