@@ -67,7 +67,12 @@ jobs:
               --capabilities CAPABILITY_NAMED_IAM \
               --parameter-overrides DeploymentTimestamp=$TIMESTAMP \
               --region us-east-1
-            aws cloudformation describe-stack-resources --stack-name $stackName
+            resourceId = aws cloudformation describe-stack-resources \
+              --stack-name "$stackName" \
+              --logical-resource-id ApiDeployment \
+              --query "StackResources[0].PhysicalResourceId" \
+              --output text
+            echo "resourceId: $resourceId"
           done
 
       - name: No CF Templates Changed
