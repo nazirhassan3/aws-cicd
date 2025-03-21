@@ -65,7 +65,7 @@ jobs:
               --stack-name "$stackName" \
               --template-file "$file" \
               --capabilities CAPABILITY_NAMED_IAM \
-              --parameters ParameterKey=DeploymentTimestamp,ParameterValue=$TIMESTAMP \
+              --parameter-overrides DeploymentTimestamp=$TIMESTAMP
               --region us-east-1
           done
 
