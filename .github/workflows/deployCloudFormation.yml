@@ -59,6 +59,7 @@ jobs:
             # Construct a stack name based on the file's basename (without .yaml extension)
             stackName=$(basename "$file" .yaml)
             TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            echo "TIMESTAMP: $TIMESTAMP"
             sed -i "s/\$TIMESTAMP\$/${TIMESTAMP}/g" $file
             cat $file  # (Optional: print the updated file for debugging)
             echo "Using stack name: $stackName"
