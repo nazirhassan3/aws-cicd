@@ -3,9 +3,14 @@ Description: >
   API Gateway REST API with multiple resource paths and two stages (Dev and Prod).
   - /users: Integrated with a Lambda function (via AWS_PROXY).
   - /orders: Integrated with an external HTTP endpoint.
-  - /html (optional): Integrated with an HTML endpoint.
   Two stages are created, and the Lambda integration URI uses a stage variable to choose
   the appropriate Lambda alias (Dev or Prod).
+
+Parameters:
+  DeploymentVersion:
+    Type: String
+    Default: "1"
+    Description: "Update this value to force a new deployment and update the stages."
 
 Resources:
   RestApi:
@@ -21,7 +26,6 @@ Resources:
       Type: TOKEN
       RestApiId: !Ref RestApi
       IdentitySource: method.request.header.Authorization
-      # Use Fn::Sub with a literal placeholder for stageVariables.lambdaAlias using Fn::Join
       AuthorizerUri: !Join
         - ""
         - - "arn:aws:apigateway:"
@@ -91,6 +95,11 @@ Resources:
             - "$"
             - "{stageVariables.lambdaAlias}"
             - "/invocations"
+        RequestTemplates:
+          application/json: |
+            {
+              "dummy": "${DeploymentVersion}"
+            }
       MethodResponses:
         - StatusCode: "200"
 
@@ -116,6 +125,8 @@ Resources:
       MethodResponses:
         - StatusCode: "200"
 
+  # Deployment resource does not specify a StageName.
+  # It uses the DeploymentVersion parameter in its Description and is forced to update by the dummy mapping.
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -125,8 +136,7 @@ Resources:
       - usagePlan
     Properties:
       RestApiId: !Ref RestApi
-      Description: "Deployment version: new"
-      StageName: dev
+      Description: !Sub "Deployment version: ${DeploymentVersion}"
 
   DevStage:
     Type: AWS::ApiGateway::Stage
