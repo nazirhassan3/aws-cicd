@@ -64,7 +64,7 @@ jobs:
               --stack-name "$stackName" \
               --template-file "$file" \
               --capabilities CAPABILITY_NAMED_IAM \
-              --region us-west-1
+              --region us-east-1
           done
 
       - name: No CF Templates Changed
