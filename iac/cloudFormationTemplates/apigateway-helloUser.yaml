@@ -140,6 +140,7 @@ Resources:
 
   DevStage:
     Type: AWS::ApiGateway::Stage
+    DependsOn: ApiDeployment
     Properties:
       StageName: dev
       RestApiId: !Ref RestApi
