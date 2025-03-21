@@ -67,11 +67,11 @@ jobs:
               --capabilities CAPABILITY_NAMED_IAM \
               --parameter-overrides DeploymentTimestamp=$TIMESTAMP \
               --region us-east-1
-            resourceId = aws cloudformation describe-stack-resources \
+            resourceId = $(aws cloudformation describe-stack-resources \
               --stack-name "$stackName" \
               --logical-resource-id ApiDeployment \
               --query "StackResources[0].PhysicalResourceId" \
-              --output text
+              --output text)
             echo "resourceId: $resourceId"
           done
 
