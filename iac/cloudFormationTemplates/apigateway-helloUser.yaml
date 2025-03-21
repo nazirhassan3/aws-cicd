@@ -7,12 +7,9 @@ Description: >
   the appropriate Lambda alias (Dev or Prod).
 
 Parameters:
-  DeploymentTimestamp:
-    Type: String
-    Description: "Current deployment timestamp, passed externally (e.g., 20250310123000)"
   DeploymentVersion:
     Type: String
-    Default: "3"
+    Default: "2"
     Description: "Update this value to force a new deployment and update the stages."
 
 Resources:
@@ -141,7 +138,7 @@ Resources:
       - CustomAuthorizer
     Properties:
       RestApiId: !Ref RestApi
-      Description: !Sub "ApiDeployment ${DeploymentTimestamp}"
+      Description: !Sub "ApiDeployment"
 
   DevStage:
     Type: AWS::ApiGateway::Stage
