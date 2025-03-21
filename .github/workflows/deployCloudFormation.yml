@@ -59,16 +59,13 @@ jobs:
             # Construct a stack name based on the file's basename (without .yaml extension)
             stackName=$(basename "$file" .yaml)
             TIMESTAMP=$(date +%Y%m%d%H%M%S)
-            echo "TIMESTAMP: $TIMESTAMP"
-            echo "file: $file"
-            sed -i "s/ApiDeployment\$TIMESTAMP\$/ApiDeployment${TIMESTAMP}/g" $file
-            cat $file  # (Optional: print the updated file for debugging)
             echo "Using stack name: $stackName"
             # Deploy the CloudFormation stack
             aws cloudformation deploy \
               --stack-name "$stackName" \
               --template-file "$file" \
               --capabilities CAPABILITY_NAMED_IAM \
+              --parameters ParameterKey=DeploymentTimestamp,ParameterValue=$TIMESTAMP \
               --region us-east-1
           done
 

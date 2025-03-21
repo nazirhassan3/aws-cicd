@@ -7,11 +7,9 @@ Description: >
   the appropriate Lambda alias (Dev or Prod).
 
 Parameters:
-  DeploymentVersion:
+  DeploymentTimestamp:
     Type: String
-    Default: "2"
-    Description: "Update this value to force a new deployment and update the stages."
-
+    Description: "Current deployment timestamp, passed externally (e.g., 20250310123000)"
 Resources:
   RestApi:
     Type: AWS::ApiGateway::RestApi
@@ -130,7 +128,7 @@ Resources:
         - StatusCode: "200"
 
   # Deployment resource without StageName so that stages are managed explicitly.
-  ApiDeployment$TIMESTAMP$:
+  ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - UsersMethod
@@ -138,25 +136,25 @@ Resources:
       - CustomAuthorizer
     Properties:
       RestApiId: !Ref RestApi
-      Description: !Sub "Deployment version: ${DeploymentVersion}"
+      Description: !Sub "ApiDeployment ${DeploymentTimestamp}"
 
   DevStage:
     Type: AWS::ApiGateway::Stage
-    DependsOn: ApiDeployment$TIMESTAMP$
+    DependsOn: ApiDeployment
     Properties:
       StageName: dev
       RestApiId: !Ref RestApi
-      DeploymentId: !Ref ApiDeployment$TIMESTAMP$
+      DeploymentId: !Ref ApiDeployment
       Variables:
         lambdaAlias: "dev"
 
   ProdStage:
     Type: AWS::ApiGateway::Stage
-    DependsOn: ApiDeployment$TIMESTAMP$
+    DependsOn: ApiDeployment
     Properties:
       StageName: prod
       RestApiId: !Ref RestApi
-      DeploymentId: !Ref ApiDeployment$TIMESTAMP$
+      DeploymentId: !Ref ApiDeployment
       Variables:
         lambdaAlias: "prod"
 
