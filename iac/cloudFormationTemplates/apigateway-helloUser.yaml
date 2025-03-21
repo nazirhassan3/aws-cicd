@@ -130,7 +130,7 @@ Resources:
         - StatusCode: "200"
 
   # Deployment resource without StageName so that stages are managed explicitly.
-  ApiDeployment:
+  ApiDeployment$TIMESTAMP$:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - UsersMethod
@@ -142,21 +142,21 @@ Resources:
 
   DevStage:
     Type: AWS::ApiGateway::Stage
-    DependsOn: ApiDeployment
+    DependsOn: ApiDeployment$TIMESTAMP$
     Properties:
       StageName: dev
       RestApiId: !Ref RestApi
-      DeploymentId: !Ref ApiDeployment
+      DeploymentId: !Ref ApiDeployment$TIMESTAMP$
       Variables:
         lambdaAlias: "dev"
 
   ProdStage:
     Type: AWS::ApiGateway::Stage
-    DependsOn: ApiDeployment
+    DependsOn: ApiDeployment$TIMESTAMP$
     Properties:
       StageName: prod
       RestApiId: !Ref RestApi
-      DeploymentId: !Ref ApiDeployment
+      DeploymentId: !Ref ApiDeployment$TIMESTAMP$
       Variables:
         lambdaAlias: "prod"
 
