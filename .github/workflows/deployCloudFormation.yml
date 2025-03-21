@@ -58,6 +58,8 @@ jobs:
             echo "Deploying template: $file"
             # Construct a stack name based on the file's basename (without .yaml extension)
             stackName=$(basename "$file" .yaml)
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            sed -i "s/\$TIMESTAMP\$/${TIMESTAMP}/g" $file
             echo "Using stack name: $stackName"
             # Deploy the CloudFormation stack
             aws cloudformation deploy \
