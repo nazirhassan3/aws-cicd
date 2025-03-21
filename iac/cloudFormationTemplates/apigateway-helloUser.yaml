@@ -31,7 +31,7 @@ Resources:
         - - "arn:aws:apigateway:"
           - !Ref "AWS::Region"
           - ":lambda:path/2015-03-31/functions/"
-          - "arn:aws:lambda:us-east-1:443370673783:function:auth"
+          - "arn:aws:lambda:us-west-1:443370673783:function:auth"
           - "/invocations"
       AuthorizerResultTtlInSeconds: 300
 
@@ -56,7 +56,7 @@ Resources:
       FunctionName: helloUser:dev
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:us-east-1:443370673783:${RestApi}/*/*/*"
+      SourceArn: !Sub "arn:aws:execute-api:us-west-1:443370673783:${RestApi}/*/*/*"
 
   LambdaPermissionForAPIGatewayProd:
     Type: AWS::Lambda::Permission
@@ -64,7 +64,7 @@ Resources:
       FunctionName: helloUser:prod
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:us-east-1:443370673783:${RestApi}/*/*/*"
+      SourceArn: !Sub "arn:aws:execute-api:us-west-1:443370673783:${RestApi}/*/*/*"
 
   # Resource: /users integrated with Lambda (using stage variable)
   UsersResource:
@@ -90,7 +90,7 @@ Resources:
           - - "arn:aws:apigateway:"
             - !Ref "AWS::Region"
             - ":lambda:path/2015-03-31/functions/"
-            - "arn:aws:lambda:us-east-1:443370673783:function:helloUser"
+            - "arn:aws:lambda:us-west-1:443370673783:function:helloUser"
             - ":"
             - "$"
             - "{stageVariables.lambdaAlias}"
