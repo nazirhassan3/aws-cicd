@@ -37,6 +37,9 @@ Resources:
 
   usagePlan:
     Type: AWS::ApiGateway::UsagePlan
+    DependsOn:
+      - DevStage
+      - ProdStage
     Properties:
       ApiStages:
         - ApiId: !Ref RestApi
