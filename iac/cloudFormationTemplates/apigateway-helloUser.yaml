@@ -136,7 +136,6 @@ Resources:
       - UsersMethod
       - ProductsMethod
       - CustomAuthorizer
-      - usagePlan
     Properties:
       RestApiId: !Ref RestApi
       Description: !Sub "Deployment version: ${DeploymentVersion}"
