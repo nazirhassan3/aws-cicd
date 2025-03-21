@@ -98,7 +98,7 @@ Resources:
         RequestTemplates:
           application/json: |
             {
-              "dummy": "${DeploymentVersion}"
+              "dummy": "Test"
             }
       MethodResponses:
         - StatusCode: "200"
