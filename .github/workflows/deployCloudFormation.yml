@@ -67,13 +67,14 @@ jobs:
               --capabilities CAPABILITY_NAMED_IAM \
               --parameter-overrides DeploymentTimestamp=$TIMESTAMP \
               --region us-east-1
-            resourceId=$(aws cloudformation describe-stack-resources \
-              --stack-name "$stackName" \
-              --logical-resource-id ApiDeployment \
-              --query "StackResources[0].PhysicalResourceId" \
-              --output text)
-            aws apigateway create-deployment --rest-api-id "$resourceId" --stage-name dev --description 'Deployed from CLI'
-            echo "resourceId: $resourceId"
+            # resourceId=$(aws cloudformation describe-stack-resources \
+            #   --stack-name "$stackName" \
+            #   --logical-resource-id ApiDeployment \
+            #   --query "StackResources[0].PhysicalResourceId" \
+            #   --output text)
+            # aws apigateway create-deployment --rest-api-id "$resourceId" --stage-name dev --description 'Deployed from CLI'
+            # echo "resourceId: $resourceId"
+            aws cloudformation describe-stack-resources --stack-name $stackName
           done
 
       - name: No CF Templates Changed
