@@ -15,7 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Request Manual Approval
-        run: echo "Waiting for manual approval to deploy API Gateway."
+        run: |
+          echo "Waiting for manual approval to deploy API Gateway."
+          echo "Version : '${{ github.event.inputs.function }}'"
 
   deploy_apigateway:
     needs: manual_approval
