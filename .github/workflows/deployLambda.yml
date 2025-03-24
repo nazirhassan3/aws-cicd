@@ -225,4 +225,4 @@ jobs:
         with:
           workflow: "approve-and-deploy.yml"
           token: ${{ secrets.PAT_TOKEN }}
-          inputs: '{"function": "${{ matrix.function }}" ,  Version="${{ steps.aliasing.outputs.VERSION }}"}'
+          inputs: '{"function": "${{ matrix.function }}" ,  "version": "${{ steps.aliasing.outputs.VERSION }}"}'

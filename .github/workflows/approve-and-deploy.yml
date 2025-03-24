@@ -17,7 +17,7 @@ jobs:
       - name: Request Manual Approval
         run: |
           echo "Waiting for manual approval to deploy API Gateway."
-          echo "Version : '${{ github.event.inputs.function }}'"
+          echo "Version : '${{ github.event.inputs.version }}'"
 
   deploy_apigateway:
     needs: manual_approval
