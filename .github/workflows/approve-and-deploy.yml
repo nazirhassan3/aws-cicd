@@ -7,6 +7,10 @@ on:
         description: "Lambda Function to Deploy API Gateway For"
         required: true
         type: string
+      version:
+        description: "Lambda Version to Deploy API Gateway For"
+        required: true
+        type: string
 
 jobs:
   manual_approval:
