@@ -9,7 +9,7 @@ Description: >
 Parameters:
   DeploymentVersion:
     Type: String
-    Default: "2"
+    Default: "3"
     Description: "Update this value to force a new deployment and update the stages."
 
 Resources:
