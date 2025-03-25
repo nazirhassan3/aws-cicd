@@ -83,8 +83,8 @@ jobs:
         run: echo "No CloudFormation template changes detected. Skipping deployment."
 
       - name: Trigger API Gateway Deployment Approval
-        if: steps.detect.outputs.TEMPLATES != ''
         uses: benc-uk/workflow-dispatch@v1
+        if: steps.detect.outputs.TEMPLATES != ''
         with:
           workflow: "deployCloudFormationToProd.yml"
           token: ${{ secrets.PAT_TOKEN }}
