@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Demo API from Client
+
+Resources:
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: "DemoAPI"
+      Description: "Demo API with 4 stages"
+
+  CustomAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: "Auth"
+      Type: REQUEST
+      RestApiId: !Ref RestApi
+      IdentitySource: "method.request.header.x-api-key"
+      AuthorizerUri: !Join
+        - ""
+        - - "arn:aws:apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - "arn:aws:lambda:us-east-1:443370673783:function:auth"
+          - "/invocations"
+
+  usagePlan:
+    Type: "AWS::ApiGateway::UsagePlan"
+    DependsOn:
+      - QAStage
+      - ProdStage
+      - UATStage
+    Properties:
+      ApiStages:
+        - ApiId: !Ref RestApi
+          Stage: qa
+        - ApiId: !Ref RestApi
+          Stage: prod
+      Description: Customer ABC's usage plan
+      Quota:
+        Limit: 100000
+        Period: DAY
+      Throttle:
+        BurstLimit: 150
+        RateLimit: 300
+      UsagePlanName: Plan_ABC
+
+  MyApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: NissanUSA Integration QA
+      Description: "Widgets for NUSA integration"
+      Enabled: true
+
+  MyUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref MyApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref usagePlan
+
+  LambdaPermissionForAPIGatewayDev:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: helloUser:dev
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:us-east-1:443370673783:${RestApi}/*/*/*"
+
+  LambdaPermissionForAPIGatewayProd:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: helloUser:prod
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:us-east-1:443370673783:${RestApi}/*/*/*"
+
+  FlushCacheResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: flushcache
+      RestApiId: !Ref RestApi
+
+  FlushCacheOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref FlushCacheResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationHttpMethod: POST
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+            ResponseTemplates:
+              application/json: ""
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+          ResponseModels:
+            application/json: Empty
+
+  FlushCachePostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref FlushCacheResource
+      HttpMethod: POST
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Join
+          - ""
+          - - "arn:aws:apigateway:"
+            - !Ref "AWS::Region"
+            - ":lambda:path/2015-03-31/functions/"
+            - "arn:aws:lambda:us-east-1:443370673783:function:helloUser"
+            - ":"
+            - "$"
+            - "{stageVariables.lambdaAlias}"
+            - "/invocations"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: Empty
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - FlushCacheOptionsMethod
+      - FlushCachePostMethod
+      - CustomAuthorizer
+    Properties:
+      RestApiId: !Ref RestApi
+      Description: "Deployment version: new"
+
+  QAStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: qa
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      Variables:
+        lambdaAlias: "qa"
+
+  ProdStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: prod
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      Variables:
+        lambdaAlias: "prod"
+
+  UATStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: uat
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
+      Variables:
+        lambdaAlias: "uat"
+
+Outputs:
+  ApiUrlDev:
+    Description: "Dev API URL"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/dev"
+  ApiUrlProd:
+    Description: "Prod API URL"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"

@@ -1,0 +1,6 @@
+{
+  "functionName": "helloWorld",
+  "functionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld",
+  "devAlias": "dev",
+  "prodAlias": "prod"
+}

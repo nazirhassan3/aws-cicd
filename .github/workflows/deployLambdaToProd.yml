@@ -1,0 +1,62 @@
+name: Approve and Deploy Lambda To Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      function:
+        description: "Lambda Function to Deploy API Gateway For"
+        required: true
+        type: string
+      version:
+        description: "Lambda Version to Deploy API Gateway For"
+        required: true
+        type: string
+
+jobs:
+  manual_approval:
+    environment:
+      name: Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Manual Approval
+        run: |
+          echo "Waiting for manual approval to deploy API Gateway."
+          echo "Version : '${{ github.event.inputs.version }}'"
+
+  deploy_apigateway:
+    needs: manual_approval
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Publish Lambda Version for Prod
+        run: |
+          FUNCTION_NAME=${{ github.event.inputs.function }}
+          ALIAS_NAME="prod"
+          VERSION=${{ github.event.inputs.version }}
+
+          ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
+
+          if [[ -z "$ALIAS_EXISTS" ]]; then
+            echo "Alias '$ALIAS_NAME' does not exist. Creating it..."
+            aws lambda create-alias \
+              --function-name $FUNCTION_NAME \
+              --name $ALIAS_NAME \
+              --function-version $VERSION
+          else
+            echo "Alias '$ALIAS_NAME' exists. Updating it..."
+            aws lambda update-alias \
+              --function-name $FUNCTION_NAME \
+              --name $ALIAS_NAME \
+              --function-version $VERSION
+          fi
+
+          echo "Alias '$ALIAS_NAME' now points to version $VERSION"

@@ -1,0 +1,91 @@
+name: Deploy Cloud Formation Templates
+
+on:
+  push:
+    branches: nazir
+    paths:
+      - "iac/cloudFormationTemplates/*.yaml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Detect Changed Templates
+        id: detect
+        run: |
+          PREVIOUS_COMMIT=${{ github.event.before }}
+          if [ -z "$PREVIOUS_COMMIT" ] || ! git rev-parse --verify "$PREVIOUS_COMMIT" >/dev/null 2>&1; then
+            PREVIOUS_COMMIT=$(git rev-parse HEAD^ || echo "")
+          fi
+
+          echo "Comparing $PREVIOUS_COMMIT with ${{ github.sha }}"
+
+          if [ -z "$PREVIOUS_COMMIT" ]; then
+            CHANGED_FILES=$(git ls-files | grep '^iac/cloudFormationTemplates/.*\.yaml$' || true)
+          else
+            CHANGED_FILES=$(git diff --name-only "$PREVIOUS_COMMIT" "${{ github.sha }}" | grep '^iac/cloudFormationTemplates/.*\.yaml$' || true)
+          fi
+
+          # Use basename to extract just the file name, sort them, and output as JSON.
+          CHANGED_TEMPLATES=$(echo "$CHANGED_FILES" | sort -u | jq -R -s -c 'split("\n")[:-1]')
+
+          echo "Detected changed TEMPLATES: $CHANGED_TEMPLATES"
+          echo "TEMPLATES=$CHANGED_TEMPLATES" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+
+      - name: Deploy Changed CF Templates
+        id: deploy
+        if: steps.detect.outputs.TEMPLATES != ''
+        run: |
+          cleaned=$(echo "${{ steps.detect.outputs.TEMPLATES }}" | sed 's/^\[//; s/\]$//')
+          # Split the cleaned string by comma into an array
+          IFS=',' read -ra TEMPLATE_ARRAY <<< "$cleaned"
+          # Iterate over each template file path
+          for file in "${TEMPLATE_ARRAY[@]}"; do
+            # Trim any extra whitespace
+            file=$(echo "$file" | xargs)
+            echo "Deploying template: $file"
+            # Construct a stack name based on the file's basename (without .yaml extension)
+            stackName=$(basename "$file" .yaml)
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            echo "Using stack name: $stackName"
+            # Deploy the CloudFormation stack
+            aws cloudformation deploy \
+              --stack-name "$stackName" \
+              --template-file "$file" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameter-overrides DeploymentTimestamp=$TIMESTAMP \
+              --region us-east-1
+            resourceId=$(aws cloudformation describe-stack-resources \
+              --stack-name "$stackName" \
+              --logical-resource-id RestApi \
+              --query "StackResources[0].PhysicalResourceId" \
+              --output text)
+            aws apigateway create-deployment --rest-api-id "$resourceId" --stage-name dev --description 'Deployed from CLI'
+            echo "resourceId=$resourceId" >> "$GITHUB_OUTPUT"
+            # aws cloudformation describe-stack-resources --stack-name $stackName
+          done
+
+      - name: No CF Templates Changed
+        if: steps.detect.outputs.TEMPLATES == ''
+        run: echo "No CloudFormation template changes detected. Skipping deployment."
+
+      - name: Trigger API Gateway Deployment Approval
+        uses: benc-uk/workflow-dispatch@v1
+        if: steps.detect.outputs.TEMPLATES != ''
+        with:
+          workflow: "deployCloudFormationToProd.yml"
+          token: ${{ secrets.PAT_TOKEN }}
+          inputs: '{"resourceId": "${{ steps.deploy.outputs.resourceId }}" }'
