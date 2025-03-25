@@ -1,4 +1,4 @@
-name: Approve and Deploy API Gateway
+name: Approve and Deploy Lambda To Prod
 
 on:
   workflow_dispatch:
@@ -41,7 +41,7 @@ jobs:
         run: |
           FUNCTION_NAME=${{ github.event.inputs.function }}
           ALIAS_NAME="prod"
-          VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
+          VERSION=${{ github.event.inputs.version }}
 
           ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
 

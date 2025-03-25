@@ -46,6 +46,7 @@ jobs:
           aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
 
       - name: Deploy Changed CF Templates
+        id: deploy
         if: steps.detect.outputs.TEMPLATES != ''
         run: |
           cleaned=$(echo "${{ steps.detect.outputs.TEMPLATES }}" | sed 's/^\[//; s/\]$//')
@@ -73,10 +74,18 @@ jobs:
               --query "StackResources[0].PhysicalResourceId" \
               --output text)
             aws apigateway create-deployment --rest-api-id "$resourceId" --stage-name dev --description 'Deployed from CLI'
-            echo "resourceId: $resourceId"
+            echo "resourceId=$resourceId" >> "$GITHUB_OUTPUT"
             # aws cloudformation describe-stack-resources --stack-name $stackName
           done
 
       - name: No CF Templates Changed
         if: steps.detect.outputs.TEMPLATES == ''
         run: echo "No CloudFormation template changes detected. Skipping deployment."
+
+      - name: Trigger API Gateway Deployment Approval
+        if: steps.detect.outputs.TEMPLATES != ''
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: "deployCloudFormationToProd.yml"
+          token: ${{ secrets.PAT_TOKEN }}
+          inputs: '{"resourceId": "${{ steps.deploy.outputs.resourceId }}" }'

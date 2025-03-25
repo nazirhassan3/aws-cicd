@@ -223,6 +223,6 @@ jobs:
       - name: Trigger API Gateway Deployment Approval
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: "approve-and-deploy.yml"
+          workflow: "deployLambdaToProd.yml"
           token: ${{ secrets.PAT_TOKEN }}
           inputs: '{"function": "${{ matrix.function }}" ,  "version": "${{ steps.aliasing.outputs.VERSION }}"}'
