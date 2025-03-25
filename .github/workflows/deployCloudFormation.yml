@@ -86,6 +86,6 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         if: steps.detect.outputs.TEMPLATES != ''
         with:
-          workflow: "deployCloudFormationToProd.yml"
+          workflow: "deployCFToProd.yml"
           token: ${{ secrets.PAT_TOKEN }}
           inputs: '{"resourceId": "${{ steps.deploy.outputs.resourceId }}" }'
