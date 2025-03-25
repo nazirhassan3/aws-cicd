@@ -125,7 +125,7 @@ Resources:
       Integration:
         IntegrationHttpMethod: GET
         Type: HTTP
-        Uri: "https://dummyjson.com/products"
+        Uri: "https://dummyjson.com/productss"
       MethodResponses:
         - StatusCode: "200"
 
