@@ -84,7 +84,6 @@ jobs:
 
       - name: Trigger API Gateway Deployment Approval
         uses: benc-uk/workflow-dispatch@v1
-        if: steps.detect.outputs.TEMPLATES != ''
         with:
           workflow: "deployCFToProd.yml"
           token: ${{ secrets.PAT_TOKEN }}
