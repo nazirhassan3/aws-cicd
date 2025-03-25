@@ -35,4 +35,4 @@ jobs:
 
       - name: Deploy API to Prod
         run: |
-          aws apigateway create-deployment --rest-api-id "${{ github.event.inputs.resourceId }}" --stage-name dev --description 'Deployed from CLI'
+          aws apigateway create-deployment --rest-api-id "${{ github.event.inputs.resourceId }}" --stage-name prod --description 'Deployed from CLI'
