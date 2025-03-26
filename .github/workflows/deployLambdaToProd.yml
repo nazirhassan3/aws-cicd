@@ -60,3 +60,34 @@ jobs:
           fi
 
           echo "Alias '$ALIAS_NAME' now points to version $VERSION"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-west-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Publish Lambda Version for Prod
+        run: |
+          FUNCTION_NAME=${{ github.event.inputs.function }}
+          ALIAS_NAME="prod"
+          VERSION=${{ github.event.inputs.version }}
+
+          ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
+
+          if [[ -z "$ALIAS_EXISTS" ]]; then
+            echo "Alias '$ALIAS_NAME' does not exist. Creating it..."
+            aws lambda create-alias \
+              --function-name $FUNCTION_NAME \
+              --name $ALIAS_NAME \
+              --function-version $VERSION
+          else
+            echo "Alias '$ALIAS_NAME' exists. Updating it..."
+            aws lambda update-alias \
+              --function-name $FUNCTION_NAME \
+              --name $ALIAS_NAME \
+              --function-version $VERSION
+          fi
+
+          echo "Alias '$ALIAS_NAME' now points to version $VERSION"
