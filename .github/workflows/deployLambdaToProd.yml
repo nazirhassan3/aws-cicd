@@ -7,8 +7,12 @@ on:
         description: "Lambda Function to Deploy API Gateway For"
         required: true
         type: string
-      version:
-        description: "Lambda Version to Deploy API Gateway For"
+      east-version:
+        description: "Lambda Version to Deploy API Gateway For East Region"
+        required: true
+        type: string
+      west-version:
+        description: "Lambda Version to Deploy API Gateway For West Region"
         required: true
         type: string
 
@@ -21,7 +25,6 @@ jobs:
       - name: Request Manual Approval
         run: |
           echo "Waiting for manual approval to deploy API Gateway."
-          echo "Version : '${{ github.event.inputs.version }}'"
 
   deploy_apigateway:
     needs: manual_approval
@@ -41,7 +44,7 @@ jobs:
         run: |
           FUNCTION_NAME=${{ github.event.inputs.function }}
           ALIAS_NAME="prod"
-          VERSION=${{ github.event.inputs.version }}
+          VERSION=${{ github.event.inputs.east-version }}
 
           ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
 
@@ -72,7 +75,7 @@ jobs:
         run: |
           FUNCTION_NAME=${{ github.event.inputs.function }}
           ALIAS_NAME="prod"
-          VERSION=${{ github.event.inputs.version }}
+          VERSION=${{ github.event.inputs.west-version }}
 
           ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
 

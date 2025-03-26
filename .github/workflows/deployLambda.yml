@@ -134,7 +134,7 @@ jobs:
           FUNCTION_NAME=${{ matrix.function }}
           ALIAS_NAME="dev"
           VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
-          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "EAST_VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
 
           if [[ -z "$ALIAS_EXISTS" ]]; then
@@ -218,7 +218,7 @@ jobs:
           FUNCTION_NAME=${{ matrix.function }}
           ALIAS_NAME="dev"
           VERSION=$(aws lambda publish-version --function-name $FUNCTION_NAME --query Version --output text)
-          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "WEST_VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           ALIAS_EXISTS=$(aws lambda list-aliases --function-name $FUNCTION_NAME --query "Aliases[?Name=='$ALIAS_NAME']" --output text)
 
           if [[ -z "$ALIAS_EXISTS" ]]; then
@@ -242,4 +242,4 @@ jobs:
         with:
           workflow: "deployLambdaToProd.yml"
           token: ${{ secrets.PAT_TOKEN }}
-          inputs: '{"function": "${{ matrix.function }}" ,  "version": "${{ steps.aliasing.outputs.VERSION }}"}'
+          inputs: '{"function": "${{ matrix.function }}" ,  "east-version": "${{ steps.aliasing.outputs.EAST_VERSION }}" , "west-version": "${{ steps.aliasing.outputs.WEST_VERSION }}"}'
