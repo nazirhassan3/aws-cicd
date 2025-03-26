@@ -129,7 +129,7 @@ jobs:
           echo "Lambda function is now Active."
 
       - name: Ensure Alias Exists and Update
-        id: aliasing
+        id: aliasing_east
         run: |
           FUNCTION_NAME=${{ matrix.function }}
           ALIAS_NAME="dev"
@@ -214,6 +214,7 @@ jobs:
           echo "Lambda function is now Active."
 
       - name: Ensure Alias Exists and Update
+        id: aliasing_west
         run: |
           FUNCTION_NAME=${{ matrix.function }}
           ALIAS_NAME="dev"
@@ -242,4 +243,4 @@ jobs:
         with:
           workflow: "deployLambdaToProd.yml"
           token: ${{ secrets.PAT_TOKEN }}
-          inputs: '{"function": "${{ matrix.function }}" ,  "east-version": "${{ steps.aliasing.outputs.EAST_VERSION }}" , "west-version": "${{ steps.aliasing.outputs.WEST_VERSION }}"}'
+          inputs: '{"function": "${{ matrix.function }}" ,  "east-version": "${{ steps.aliasing_east.outputs.EAST_VERSION }}" , "west-version": "${{ steps.aliasing_west.outputs.WEST_VERSION }}"}'
