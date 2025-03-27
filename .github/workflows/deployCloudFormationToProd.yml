@@ -3,7 +3,11 @@ name: Approve and Deploy API Gateway To Prod
 on:
   workflow_dispatch:
     inputs:
-      resourceId:
+      east-resourceId:
+        description: "API Resource ID"
+        required: true
+        type: string
+      west-resourceId:
         description: "API Resource ID"
         required: true
         type: string
@@ -17,7 +21,6 @@ jobs:
       - name: Request Manual Approval
         run: |
           echo "Waiting for manual approval to deploy API Gateway."
-          echo "Version : '${{ github.event.inputs.version }}'"
 
   deploy_apigateway:
     needs: manual_approval
@@ -35,4 +38,15 @@ jobs:
 
       - name: Deploy API to Prod
         run: |
-          aws apigateway create-deployment --rest-api-id "${{ github.event.inputs.resourceId }}" --stage-name prod --description 'Deployed from CLI'
+          aws apigateway create-deployment --rest-api-id "${{ github.event.inputs.east-resourceId }}" --stage-name prod --description 'Deployed from CLI'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-west-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Deploy API to Prod
+        run: |
+          aws apigateway create-deployment --rest-api-id "${{ github.event.inputs.west-resourceId }}" --stage-name prod --description 'Deployed from CLI'

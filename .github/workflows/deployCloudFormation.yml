@@ -46,7 +46,7 @@ jobs:
           aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
 
       - name: Deploy Changed CF Templates
-        id: deploy
+        id: east-deploy
         if: steps.detect.outputs.TEMPLATES != ''
         run: |
           cleaned=$(echo "${{ steps.detect.outputs.TEMPLATES }}" | sed 's/^\[//; s/\]$//')
@@ -74,7 +74,47 @@ jobs:
               --query "StackResources[0].PhysicalResourceId" \
               --output text)
             aws apigateway create-deployment --rest-api-id "$resourceId" --stage-name dev --description 'Deployed from CLI'
-            echo "resourceId=$resourceId" >> "$GITHUB_OUTPUT"
+            echo "east-resourceId=$resourceId" >> "$GITHUB_OUTPUT"
+            # aws cloudformation describe-stack-resources --stack-name $stackName
+          done
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-west-1
+          aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+
+      - name: Deploy Changed CF Templates
+        id: west-deploy
+        if: steps.detect.outputs.TEMPLATES != ''
+        run: |
+          cleaned=$(echo "${{ steps.detect.outputs.TEMPLATES }}" | sed 's/^\[//; s/\]$//')
+          # Split the cleaned string by comma into an array
+          IFS=',' read -ra TEMPLATE_ARRAY <<< "$cleaned"
+          # Iterate over each template file path
+          for file in "${TEMPLATE_ARRAY[@]}"; do
+            # Trim any extra whitespace
+            file=$(echo "$file" | xargs)
+            echo "Deploying template: $file"
+            # Construct a stack name based on the file's basename (without .yaml extension)
+            stackName=$(basename "$file" .yaml)
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            echo "Using stack name: $stackName"
+            # Deploy the CloudFormation stack
+            aws cloudformation deploy \
+              --stack-name "$stackName" \
+              --template-file "$file" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameter-overrides DeploymentTimestamp=$TIMESTAMP \
+              --region us-east-1
+            resourceId=$(aws cloudformation describe-stack-resources \
+              --stack-name "$stackName" \
+              --logical-resource-id RestApi \
+              --query "StackResources[0].PhysicalResourceId" \
+              --output text)
+            aws apigateway create-deployment --rest-api-id "$resourceId" --stage-name dev --description 'Deployed from CLI'
+            echo "west-resourceId=$resourceId" >> "$GITHUB_OUTPUT"
             # aws cloudformation describe-stack-resources --stack-name $stackName
           done
 
@@ -88,4 +128,4 @@ jobs:
         with:
           workflow: "deployCloudFormationToProd.yml"
           token: ${{ secrets.PAT_TOKEN }}
-          inputs: '{"resourceId": "${{ steps.deploy.outputs.resourceId }}" }'
+          inputs: '{"east-resourceId": "${{ steps.east-deploy.outputs.east-resourceId }}", "west-resourceId": "${{ steps.west-deploy.outputs.west-resourceId }}" }'

@@ -1,6 +1,6 @@
 {
   "functionName": "helloWorld",
-  "functionArn": "arn:aws:lambda:us-east-1:443370673783:function:helloWorld",
-  "devAlias": "dev",
-  "prodAlias": "prod"
+  "runTimeEnv": "python3.13",
+  "roleARN": "arn:aws:iam::443370673783:role/basicLambdaRole",
+  "handler": "lambda_function.lambda_handler"
 }
