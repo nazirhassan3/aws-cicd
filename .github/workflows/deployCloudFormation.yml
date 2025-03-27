@@ -107,7 +107,7 @@ jobs:
               --template-file "$file" \
               --capabilities CAPABILITY_NAMED_IAM \
               --parameter-overrides DeploymentTimestamp=$TIMESTAMP \
-              --region us-east-1
+              --region us-west-1
             resourceId=$(aws cloudformation describe-stack-resources \
               --stack-name "$stackName" \
               --logical-resource-id RestApi \
