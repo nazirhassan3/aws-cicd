@@ -12,39 +12,13 @@ Resources:
       LogGroupName: "/aws/apigateway/events"
       RetentionInDays: 30
 
-  # IAM Role for API Gateway logging
-  ApiGatewayLogsRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: "ApiGatewayLogsRoleForLogging"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - "apigateway.amazonaws.com"
-            Action: "sts:AssumeRole"
-      Policies:
-        - PolicyName: "ApiGatewayLoggingPolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: "AllowAPIGatewayLogging"
-                Effect: Allow
-                Action:
-                  - "logs:CreateLogGroup"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                Resource: "arn:aws:logs:*:*:*"
-
   # Set the CloudWatch Logs role at the API Gateway account level.
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
     Properties:
-      CloudWatchRoleArn: !GetAtt ApiGatewayLogsRole.Arn
+      CloudWatchRoleArn: "arn:aws:iam::443370673783:role/ApiGatewayLogsRoleForLogging"
 
 Outputs:
   ApiGatewayLogsRoleArn:
     Description: "The ARN of the IAM Role for API Gateway Logging"
-    Value: !GetAtt ApiGatewayLogsRole.Arn
+    Value: "arn:aws:iam::443370673783:role/ApiGatewayLogsRoleForLogging"
