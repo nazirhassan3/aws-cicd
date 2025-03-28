@@ -13,6 +13,13 @@ Parameters:
     Description: "Update this value to force a new deployment and update the stages."
 
 Resources:
+  # CloudWatch Log Group for API Gateway Access Logs
+  ApiAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: "/aws/api-gateway/access-logs"
+      RetentionInDays: 14
+
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -147,6 +154,15 @@ Resources:
       StageName: dev
       RestApiId: !Ref RestApi
       DeploymentId: !Ref ApiDeployment
+      # Configure access logging to CloudWatch Logs
+      AccessLogSetting:
+        DestinationArn: !GetAtt ApiAccessLogs.Arn
+        Format: >
+          {"requestId":"$context.requestId", "ip": "$context.identity.sourceIp",
+          "caller": "$context.identity.caller", "user": "$context.identity.user",
+          "requestTime": "$context.requestTime", "httpMethod": "$context.httpMethod",
+          "resourcePath": "$context.resourcePath", "status": "$context.status",
+          "protocol": "$context.protocol"}
       Variables:
         lambdaAlias: "dev"
 
