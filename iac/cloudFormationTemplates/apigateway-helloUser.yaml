@@ -9,7 +9,6 @@ Description: >
 Parameters:
   region:
     Type: String
-    required: true
     Description: "Update this value to force a new deployment and update the stages."
 
 Resources:
