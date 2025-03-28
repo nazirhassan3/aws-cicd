@@ -1,60 +1,47 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Centralized logging for API Gateway events using CloudWatch Logs and CloudTrail.
-  This stack creates:
-    - A CloudWatch Log Group to store API Gateway logs.
-    - An IAM Role for API Gateway to write logs.
-    - An API Gateway Account configuration to set the CloudWatch role.
-    - (Optionally) a CloudTrail trail to capture all API Gateway events.
+  Centralized logging for API Gateway events using CloudWatch Logs.
+  This stack sets up a CloudWatch Log Group, an IAM Role for API Gateway logging,
+  and configures the API Gateway account to use that role.
 
 Resources:
-  # 1. CloudWatch Log Group for API Gateway events
+  # CloudWatch Log Group for API Gateway events
   ApiGatewayLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: "/aws/apigateway/events"
       RetentionInDays: 30
 
-  # 2. IAM Role for API Gateway to write logs to CloudWatch Logs
+  # IAM Role for API Gateway to write logs to CloudWatch Logs
   ApiGatewayLogsRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: "ApiGatewayLogsRoleForLogging"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
-              Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole
+              Service:
+                - "apigateway.amazonaws.com"
+            Action: "sts:AssumeRole"
       Policies:
-        - PolicyName: ApiGatewayLogsPolicy
+        - PolicyName: "ApiGatewayLoggingPolicy"
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub "${ApiGatewayLogGroup.Arn}:*"
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
 
-  # 3. Set the CloudWatch Logs role at the API Gateway account level.
+  # Configure the API Gateway account to use the CloudWatch Logs role
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
     Properties:
       CloudWatchRoleArn: !GetAtt ApiGatewayLogsRole.Arn
-
-  # 4. (Optional) Create a CloudTrail trail to capture API Gateway and other events.
-  ApiGatewayCloudTrail:
-    Type: AWS::CloudTrail::Trail
-    Properties:
-      TrailName: "APIGatewayEventsTrail"
-      S3BucketName: "logger-apigateway"
-      IsLogging: true
-      IncludeGlobalServiceEvents: true
-      # Send CloudTrail logs to CloudWatch Logs
-      CloudWatchLogsLogGroupArn: !GetAtt ApiGatewayLogGroup.Arn
-      CloudWatchLogsRoleArn: !GetAtt ApiGatewayLogsRole.Arn
 
 Outputs:
   LogGroupName:
@@ -63,6 +50,3 @@ Outputs:
   ApiGatewayLogsRoleArn:
     Description: "IAM Role ARN used by API Gateway for logging"
     Value: !GetAtt ApiGatewayLogsRole.Arn
-  CloudTrailName:
-    Description: "Name of the CloudTrail trail for API Gateway events"
-    Value: !Ref ApiGatewayCloudTrail
