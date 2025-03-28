@@ -7,9 +7,9 @@ Description: >
   the appropriate Lambda alias (Dev or Prod).
 
 Parameters:
-  DeploymentVersion:
+  region:
     Type: String
-    Default: "5"
+    required: true
     Description: "Update this value to force a new deployment and update the stages."
 
 Resources:

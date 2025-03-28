@@ -66,7 +66,7 @@ jobs:
               --stack-name "$stackName" \
               --template-file "$file" \
               --capabilities CAPABILITY_NAMED_IAM \
-              --parameter-overrides DeploymentTimestamp=$TIMESTAMP \
+              --parameter-overrides region='us-east-1' \
               --region us-east-1
             resourceId=$(aws cloudformation describe-stack-resources \
               --stack-name "$stackName" \
@@ -106,7 +106,7 @@ jobs:
               --stack-name "$stackName" \
               --template-file "$file" \
               --capabilities CAPABILITY_NAMED_IAM \
-              --parameter-overrides DeploymentTimestamp=$TIMESTAMP \
+              --parameter-overrides region='us-west-1' \
               --region us-west-1
             resourceId=$(aws cloudformation describe-stack-resources \
               --stack-name "$stackName" \
