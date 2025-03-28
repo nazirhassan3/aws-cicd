@@ -1,18 +1,18 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   Centralized logging for API Gateway events using CloudWatch Logs.
-  This stack sets up a CloudWatch Log Group, an IAM Role for API Gateway logging,
-  and configures the API Gateway account to use that role.
+  This stack sets up an IAM role with the required trust and permissions and then assigns
+  it to API Gateway via the AWS::ApiGateway::Account resource.
 
 Resources:
-  # CloudWatch Log Group for API Gateway events
+  # CloudWatch Log Group for API Gateway logs (optional if you want to create one explicitly)
   ApiGatewayLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: "/aws/apigateway/events"
       RetentionInDays: 30
 
-  # IAM Role for API Gateway to write logs to CloudWatch Logs
+  # IAM Role for API Gateway logging
   ApiGatewayLogsRole:
     Type: AWS::IAM::Role
     Properties:
@@ -30,23 +30,21 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              - Effect: Allow
+              - Sid: "AllowAPIGatewayLogging"
+                Effect: Allow
                 Action:
                   - "logs:CreateLogGroup"
                   - "logs:CreateLogStream"
                   - "logs:PutLogEvents"
-                Resource: "*"
+                Resource: "arn:aws:logs:*:*:*"
 
-  # Configure the API Gateway account to use the CloudWatch Logs role
+  # Set the CloudWatch Logs role at the API Gateway account level.
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
     Properties:
       CloudWatchRoleArn: !GetAtt ApiGatewayLogsRole.Arn
 
 Outputs:
-  LogGroupName:
-    Description: "CloudWatch Logs Log Group for API Gateway events"
-    Value: !Ref ApiGatewayLogGroup
   ApiGatewayLogsRoleArn:
-    Description: "IAM Role ARN used by API Gateway for logging"
+    Description: "The ARN of the IAM Role for API Gateway Logging"
     Value: !GetAtt ApiGatewayLogsRole.Arn
